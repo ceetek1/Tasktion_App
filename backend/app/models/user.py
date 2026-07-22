@@ -6,4 +6,4 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(unique=True)
     hashed_password: Mapped[str] = mapped_column()
-    role: Mapped[str] = mapped_column(default="members")
+    role: Mapped[str] = mapped_column(default="member")
