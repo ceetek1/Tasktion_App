@@ -17,8 +17,7 @@ class TaskRead(TaskBase):
     id : int
     status: str
     user_id: int
-
-
+    assigned_to: int | None = None
     model_config = ConfigDict(from_attributes= True)
 
 
@@ -28,3 +27,7 @@ class TaskUpdate(BaseModel):
     description: str | None = None
     due_date: datetime | None = None
     status: str | None = None
+
+class TaskAssign(BaseModel):
+    assigned_to: int
+

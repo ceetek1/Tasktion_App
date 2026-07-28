@@ -11,3 +11,4 @@ class Task(Base):
     due_date: Mapped[datetime]
     status: Mapped[str] = mapped_column(default="pending")
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    assigned_to: Mapped[int| None] = mapped_column(ForeignKey("users.id"))
