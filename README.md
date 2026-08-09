@@ -1,6 +1,6 @@
 # Tasktion
 
-A real-world productivity tool for managing tasks, deadlines, and reminders. Built by a university student after a series of rushed projects — Tasktion helps you stay ahead of deadlines with automated email reminders.
+A Productivity Tool that helps groups during group projects assign tasks to members and keep track of their tasks.
 
 ## Features
 
@@ -13,6 +13,7 @@ A real-world productivity tool for managing tasks, deadlines, and reminders. Bui
 ## Tech Stack
 
 ### Backend
+
 - **FastAPI** — API framework
 - **SQLAlchemy** — ORM (Python ↔ database)
 - **Alembic** — Database migrations
@@ -24,9 +25,11 @@ A real-world productivity tool for managing tasks, deadlines, and reminders. Bui
 - **psycopg2-binary** — PostgreSQL driver
 
 ### Frontend
+
 - HTML, CSS, Vanilla JavaScript
 
 ### Database
+
 - **PostgreSQL** — Local development
 - **Supabase** — Production (hosted PostgreSQL)
 
@@ -41,34 +44,40 @@ A real-world productivity tool for managing tasks, deadlines, and reminders. Bui
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd Tasktion_App
    ```
 
 2. **Set up a virtual environment**
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. **Install dependencies**
+
    ```bash
    pip install -r backend/requirements.txt
    ```
 
 4. **Configure environment variables**
+
    ```bash
    cp backend/.env.example backend/.env
    # Edit .env with your database URL, email credentials, and JWT secret
    ```
 
 5. **Run database migrations**
+
    ```bash
    cd backend && alembic upgrade head
    ```
 
 6. **Start the application**
+
    ```bash
    cd backend && uvicorn app.main:app --reload
    ```
@@ -113,14 +122,14 @@ This folder contains all server-side components:
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `SECRET_KEY` | JWT signing secret |
-| `SMTP_SERVER` | Email server address |
-| `SMTP_PORT` | Email server port |
-| `SMTP_USER` | Email account username |
-| `SMTP_PASSWORD` | Email account password |
+| Variable        | Description                  |
+| --------------- | ---------------------------- |
+| `DATABASE_URL`  | PostgreSQL connection string |
+| `SECRET_KEY`    | JWT signing secret           |
+| `SMTP_SERVER`   | Email server address         |
+| `SMTP_PORT`     | Email server port            |
+| `SMTP_USER`     | Email account username       |
+| `SMTP_PASSWORD` | Email account password       |
 
 ## License
 
