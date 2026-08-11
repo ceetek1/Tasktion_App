@@ -1,13 +1,24 @@
 from fastapi import FastAPI
-from app.api.tasks import  router as tasks_router
+from app.api.tasks import router as tasks_router
 from app.api.auth import router as auth_router
 from app.api.admin import router as admin_router
-from app.services.scheduler import start_scheduler
+from app.api.users import router as users_router
+from app.services.scheduler import configure_scheduler, scheduler
 
 app = FastAPI()
+
 app.include_router(tasks_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(users_router)
+
+
 @app.on_event("startup")
-def on_startup():
-    start_scheduler()
+async def on_startup():
+    configure_scheduler()
+    scheduler.start()
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    scheduler.shutdown(wait=True)

@@ -1,8 +1,9 @@
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-def start_scheduler():
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(print_job, "interval", seconds=5)
-    scheduler.start()
-def print_job():
-    print("Scheduler is running")
+scheduler = AsyncIOScheduler()
+
+
+def configure_scheduler():
+    """Register scheduled jobs. Called during FastAPI startup."""
+    # Example: scheduler.add_job(send_reminders, 'cron', hour=8)
+    pass
