@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     MAILTRAP_PORT: int
     MAILTRAP_USER: str
     MAILTRAP_PASSWORD: str
+    ADMIN_SECRET: str = ""
 
     model_config = SettingsConfigDict(env_file=".env")
 

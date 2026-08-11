@@ -1,4 +1,4 @@
-from fastapi import APIRouter,Depends,HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
@@ -18,6 +18,24 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Email already registered")
     hashed_password = hash_password(user.password)
     new_user = User(email=user.email, hashed_password=hashed_password)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+
+@router.post("/auth/register-admin", response_model=UserRead, status_code=201)
+def register_admin(
+    user: UserCreate,
+    x_admin_secret: str = Header(...),
+    db: Session = Depends(get_db),
+):
+    if not settings.ADMIN_SECRET or x_admin_secret != settings.ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    if db.query(User).filter(User.email == user.email).first():
+        raise HTTPException(status_code=409, detail="Email already registered")
+    hashed_password = hash_password(user.password)
+    new_user = User(email=user.email, hashed_password=hashed_password, role="admin")
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
