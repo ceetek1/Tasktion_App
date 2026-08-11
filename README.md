@@ -122,14 +122,19 @@ This folder contains all server-side components:
 
 ## Environment Variables
 
-| Variable        | Description                  |
-| --------------- | ---------------------------- |
-| `DATABASE_URL`  | PostgreSQL connection string |
-| `SECRET_KEY`    | JWT signing secret           |
-| `SMTP_SERVER`   | Email server address         |
-| `SMTP_PORT`     | Email server port            |
-| `SMTP_USER`     | Email account username       |
-| `SMTP_PASSWORD` | Email account password       |
+| Variable              | Description                                  |
+| --------------------- | -------------------------------------------- |
+| `POSTGRES_HOST`       | PostgreSQL host (default: localhost)         |
+| `POSTGRES_PORT`       | PostgreSQL port (default: 5432)              |
+| `POSTGRES_USER`       | PostgreSQL username                          |
+| `POSTGRES_PASSWORD`   | PostgreSQL password                          |
+| `POSTGRES_DB`         | PostgreSQL database name                     |
+| `SECRET_KEY`          | JWT signing secret (use a strong random key) |
+| `MAILTRAP_HOST`       | SMTP server for email sending                |
+| `MAILTRAP_PORT`       | SMTP port (default: 2525)                    |
+| `MAILTRAP_USER`       | SMTP username                                |
+| `MAILTRAP_PASSWORD`   | SMTP password                                |
+| `ADMIN_SECRET`        | Secret key for admin registration            |
 
 ## License
 

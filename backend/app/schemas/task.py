@@ -1,10 +1,10 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 
 
 
 class TaskBase(BaseModel):
-    title: str
+    title: str = Field(..., min_length=1, max_length=200)
     description: str | None = None
     due_date: datetime
 
@@ -23,7 +23,7 @@ class TaskRead(TaskBase):
 
 
 class TaskUpdate(BaseModel):
-    title: str | None = None
+    title: str | None = Field(None, min_length=1, max_length=200)
     description: str | None = None
     due_date: datetime | None = None
     status: str | None = None
