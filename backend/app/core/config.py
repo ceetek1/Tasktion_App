@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     MAILTRAP_USER: str
     MAILTRAP_PASSWORD: str
     ADMIN_SECRET: str = ""
+    ALLOWED_ORIGINS: str = ""
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent.parent / ".env"
