@@ -30,6 +30,22 @@ async function login(email, password) {
     return apiRequest("POST", "/auth/login", { email, password });
 }
 
+async function registerAdmin(email, password, adminSecret) {
+    const response = await fetch(`${API_BASE}/auth/register-admin`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "x-admin-secret": adminSecret,
+        },
+        body: JSON.stringify({ email, password }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.detail || "Registration failed");
+    }
+    return data;
+}
+
 // Tasks
 async function fetchTasks() {
     return apiRequest("GET", "/tasks");

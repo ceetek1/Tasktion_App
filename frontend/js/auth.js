@@ -3,17 +3,22 @@
     const tabBtns = document.querySelectorAll(".tab-btn");
     const loginForm = document.getElementById("login-form");
     const registerForm = document.getElementById("register-form");
+    const adminForm = document.getElementById("admin-form");
 
     tabBtns.forEach(function (btn) {
         btn.addEventListener("click", function () {
             tabBtns.forEach(function (b) { b.classList.remove("active"); });
-            loginForm.classList.remove("active");
-            registerForm.classList.remove("active");
+            if (loginForm) loginForm.classList.remove("active");
+            if (registerForm) registerForm.classList.remove("active");
+            if (adminForm) adminForm.classList.remove("active");
             btn.classList.add("active");
-            if (btn.dataset.tab === "login") {
+            var target = btn.dataset.tab;
+            if (target === "login" && loginForm) {
                 loginForm.classList.add("active");
-            } else {
+            } else if (target === "register" && registerForm) {
                 registerForm.classList.add("active");
+            } else if (target === "admin" && adminForm) {
+                adminForm.classList.add("active");
             }
         });
     });
@@ -57,6 +62,26 @@
                 errorEl.textContent = err.message;
             }
         });
+
+        // Admin registration
+        if (adminForm) {
+            adminForm.addEventListener("submit", async function (e) {
+                e.preventDefault();
+                var email = document.getElementById("admin-email").value;
+                var password = document.getElementById("admin-password").value;
+                var adminSecret = document.getElementById("admin-secret").value;
+                var errorEl = document.getElementById("admin-error");
+                try {
+                    var result = await registerAdmin(email, password, adminSecret);
+                    // Auto-login after registration
+                    var loginResult = await login(email, password);
+                    localStorage.setItem("token", loginResult.access_token);
+                    window.location.href = "dashboard.html";
+                } catch (err) {
+                    errorEl.textContent = err.message;
+                }
+            });
+        }
     }
 
     // Dashboard page

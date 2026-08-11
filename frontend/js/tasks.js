@@ -49,6 +49,8 @@
     });
 
     // Load tasks
+    var usersCache = [];
+
     async function loadTasks() {
         try {
             var tasks = await fetchTasks();
@@ -61,17 +63,23 @@
         try {
             var adminTasks = await fetchAllTasks();
             adminSection.classList.remove("hidden");
-            renderTasks(adminTasks, adminTaskList, true);
+            // Load users for assignment dropdown
+            try {
+                usersCache = await fetchUsers();
+            } catch (e) {
+                usersCache = [];
+            }
+            renderAdminTasks(adminTasks);
         } catch (err) {
             // Not an admin, hide admin section
             adminSection.classList.add("hidden");
         }
     }
 
-    function renderTasks(tasks, container, isAdmin) {
+    function renderTasks(tasks, container) {
         container.innerHTML = "";
         if (tasks.length === 0) {
-            container.innerHTML = "<p>No tasks found.</p>";
+            container.innerHTML = "<p>No tasks yet. Create one to get started.</p>";
             return;
         }
         tasks.forEach(function (task) {
@@ -79,15 +87,7 @@
             card.className = "task-card";
 
             var statusClass = "status-" + task.status.replace(" ", "_");
-            var dueDateStr = new Date(task.due_date).toLocaleString();
-
-            var actionsHtml = "";
-            if (!isAdmin || isAdmin) {
-                actionsHtml = '<div class="task-actions">' +
-                    '<button class="edit-btn" onclick="toggleStatus(' + task.id + ', \'' + task.status + '\')">Toggle Status</button>' +
-                    '<button class="delete-btn" onclick="removeTask(' + task.id + ')">Delete</button>' +
-                    '</div>';
-            }
+            var dueDateStr = new Date(task.due_date).toLocaleDateString();
 
             card.innerHTML =
                 '<div class="task-info">' +
@@ -98,9 +98,54 @@
                         '<span>Due: ' + dueDateStr + '</span>' +
                     '</div>' +
                 '</div>' +
-                actionsHtml;
+                '<div class="task-actions">' +
+                    '<button class="edit-btn" onclick="toggleStatus(' + task.id + ', \'' + task.status + '\')">Cycle Status</button>' +
+                    '<button class="delete-btn" onclick="removeTask(' + task.id + ')">Delete</button>' +
+                '</div>';
 
             container.appendChild(card);
+        });
+    }
+
+    function renderAdminTasks(tasks) {
+        adminTaskList.innerHTML = "";
+        if (tasks.length === 0) {
+            adminTaskList.innerHTML = "<p>No tasks in the system.</p>";
+            return;
+        }
+
+        var selectOptions = '<option value="">Assign to...</option>';
+        usersCache.forEach(function (u) {
+            selectOptions += '<option value="' + u.id + '">' + escapeHtml(u.email) + ' (' + u.role + ')</option>';
+        });
+
+        tasks.forEach(function (task) {
+            var card = document.createElement("div");
+            card.className = "task-card";
+
+            var statusClass = "status-" + task.status.replace(" ", "_");
+            var dueDateStr = new Date(task.due_date).toLocaleDateString();
+            var assignedLabel = task.assigned_to ?
+                (usersCache.find(function(u) { return u.id === task.assigned_to; }) || {}).email || "User #" + task.assigned_to :
+                "Unassigned";
+
+            card.innerHTML =
+                '<div class="task-info">' +
+                    '<h3>' + escapeHtml(task.title) + '</h3>' +
+                    (task.description ? '<p>' + escapeHtml(task.description) + '</p>' : '') +
+                    '<div class="task-meta">' +
+                        '<span class="task-status ' + statusClass + '">' + escapeHtml(task.status) + '</span>' +
+                        '<span>Due: ' + dueDateStr + '</span>' +
+                        '<span>Assigned: ' + escapeHtml(assignedLabel) + '</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="task-actions">' +
+                    '<select onchange="assignTask(' + task.id + ', this.value)" style="padding:6px 10px;border:1px solid var(--gray-300);border-radius:var(--radius);font-size:12px;">' + selectOptions + '</select>' +
+                    '<button class="edit-btn" onclick="toggleStatus(' + task.id + ', \'' + task.status + '\')">Cycle</button>' +
+                    '<button class="delete-btn" onclick="removeTask(' + task.id + ')">Delete</button>' +
+                '</div>';
+
+            adminTaskList.appendChild(card);
         });
     }
 
@@ -135,6 +180,16 @@
             await loadTasks();
         } catch (err) {
             alert("Failed to update task: " + err.message);
+        }
+    };
+
+    window.assignTask = async function (taskId, userId) {
+        if (!userId) return;
+        try {
+            await assignTask(taskId, parseInt(userId));
+            await loadTasks();
+        } catch (err) {
+            alert("Failed to assign task: " + err.message);
         }
     };
 

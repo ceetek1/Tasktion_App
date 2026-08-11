@@ -21,12 +21,14 @@
             <button id="add-task-btn" class="btn-primary">+ Add Task</button>
 
             <div id="add-task-form" class="form-card hidden">
-                <h3>New Task</h3>
-                <input type="text" id="task-title" placeholder="Title" required>
-                <textarea id="task-description" placeholder="Description"></textarea>
+                <h3>Create New Task</h3>
+                <input type="text" id="task-title" placeholder="Task title" required>
+                <textarea id="task-description" placeholder="Describe the task (optional)"></textarea>
                 <input type="datetime-local" id="task-due-date" required>
-                <button id="save-task-btn">Save</button>
-                <button id="cancel-task-btn" class="btn-secondary">Cancel</button>
+                <div>
+                    <button id="save-task-btn" class="btn-primary">Create</button>
+                    <button id="cancel-task-btn" class="btn-secondary">Cancel</button>
+                </div>
                 <p class="error" id="task-error"></p>
             </div>
 
@@ -34,7 +36,8 @@
         </section>
 
         <section id="admin-section" class="task-section hidden">
-            <h2>Admin — All Tasks</h2>
+            <h2>Admin Panel</h2>
+            <p style="color: var(--gray-500); font-size: 14px; margin-bottom: 16px;">Manage all tasks and assign them to team members.</p>
             <div id="admin-task-list"></div>
         </section>
     </main>
