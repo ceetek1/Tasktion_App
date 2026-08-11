@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tasktion — Dashboard</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <h1>Tasktion</h1>
+        <div class="nav-right">
+            <span id="user-email"></span>
+            <button id="logout-btn">Logout</button>
+        </div>
+    </nav>
+
+    <main class="dashboard">
+        <section class="task-section">
+            <h2>My Tasks</h2>
+            <button id="add-task-btn" class="btn-primary">+ Add Task</button>
+
+            <div id="add-task-form" class="form-card hidden">
+                <h3>New Task</h3>
+                <input type="text" id="task-title" placeholder="Title" required>
+                <textarea id="task-description" placeholder="Description"></textarea>
+                <input type="datetime-local" id="task-due-date" required>
+                <button id="save-task-btn">Save</button>
+                <button id="cancel-task-btn" class="btn-secondary">Cancel</button>
+                <p class="error" id="task-error"></p>
+            </div>
+
+            <div id="task-list"></div>
+        </section>
+
+        <section id="admin-section" class="task-section hidden">
+            <h2>Admin — All Tasks</h2>
+            <div id="admin-task-list"></div>
+        </section>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/tasks.js"></script>
+</body>
+</html>
