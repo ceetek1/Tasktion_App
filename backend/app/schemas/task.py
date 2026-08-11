@@ -17,6 +17,9 @@ class TaskBase(BaseModel):
     @field_validator("due_date")
     @classmethod
     def due_date_must_be_future(cls, v):
+        # If datetime is naive, assume UTC
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
         if v <= datetime.now(timezone.utc):
             raise ValueError("due_date must be in the future")
         return v

@@ -18,5 +18,5 @@ class Task(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     assigned_to: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
 
-    owner = relationship("User", foreign_keys=[user_id], backref="created_tasks")
-    assignee = relationship("User", foreign_keys=[assigned_to], backref="assigned_tasks")
+    owner = relationship("User", foreign_keys=[user_id], back_populates="created_tasks")
+    assignee = relationship("User", foreign_keys=[assigned_to], back_populates="assigned_tasks")
