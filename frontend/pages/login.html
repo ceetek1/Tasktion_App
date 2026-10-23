@@ -3,45 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tasktion — Login</title>
-    <link rel="stylesheet" href="../css/style.css">
+    <title>Tasktion — Log in</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800&display=swap">
+    <link rel="stylesheet" href="../css/style.css?v=2">
 </head>
 <body>
-    <div class="auth-container">
-        <h1>Tasktion</h1>
-        <p>Assign tasks. Track progress. Stay organized.</p>
+    <div class="garden">
+        <div class="garden-inner">
+            <header class="topline">
+                <span class="brand"><span id="brand-bug"></span><span class="brand-name">Tasktion</span></span>
+            </header>
 
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="login">Login</button>
-            <button class="tab-btn" data-tab="register">Register</button>
-            <button class="tab-btn" data-tab="admin">Admin</button>
+            <div class="split">
+                <div class="copy">
+                    <h1 class="display">Squash tasks. Earn XP. Keep your bug happy.</h1>
+                    <p class="lede">Assign tasks to your group, track who's doing what, and get a nudge before anything goes stinky.</p>
+                    <div style="display: flex; align-items: flex-end; gap: 6px;" id="login-critters" aria-hidden="true"></div>
+                </div>
+
+                <div class="auth-card">
+                    <div class="tabs" role="tablist" aria-label="Account">
+                        <button class="tab-btn active" data-tab="login" type="button">Log in</button>
+                        <button class="tab-btn" data-tab="register" type="button">Sign up</button>
+                        <button class="tab-btn" data-tab="admin" type="button">Admin</button>
+                    </div>
+
+                    <form id="login-form" class="auth-form active">
+                        <div class="field">
+                            <label for="login-email" class="label-line">Email</label>
+                            <input class="input" type="email" id="login-email" placeholder="you@example.com" required autocomplete="email">
+                        </div>
+                        <div class="field">
+                            <label for="login-password" class="label-line">Password</label>
+                            <input class="input" type="password" id="login-password" required autocomplete="current-password">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Let me in!</button>
+                        <p class="field-error" id="login-error" role="alert"></p>
+                    </form>
+
+                    <form id="register-form" class="auth-form">
+                        <div class="field">
+                            <label for="register-email" class="label-line">Email</label>
+                            <input class="input" type="email" id="register-email" placeholder="you@example.com" required autocomplete="email">
+                        </div>
+                        <div class="field">
+                            <label for="register-password" class="label-line">Password <span class="muted">(8+ characters)</span></label>
+                            <input class="input" type="password" id="register-password" required minlength="8" autocomplete="new-password">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Hatch my account</button>
+                        <p class="field-error" id="register-error" role="alert"></p>
+                    </form>
+
+                    <form id="admin-form" class="auth-form">
+                        <div class="field">
+                            <label for="admin-email" class="label-line">Admin email</label>
+                            <input class="input" type="email" id="admin-email" placeholder="boss@example.com" required autocomplete="email">
+                        </div>
+                        <div class="field">
+                            <label for="admin-password" class="label-line">Password <span class="muted">(8+ characters)</span></label>
+                            <input class="input" type="password" id="admin-password" required minlength="8" autocomplete="new-password">
+                        </div>
+                        <div class="field">
+                            <label for="admin-secret" class="label-line">Admin secret key</label>
+                            <input class="input" type="password" id="admin-secret" required autocomplete="off">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Become Chief Bug Boss</button>
+                        <p class="field-error" id="admin-error" role="alert"></p>
+                    </form>
+                </div>
+            </div>
         </div>
-
-        <form id="login-form" class="auth-form active">
-            <input type="email" id="login-email" placeholder="Email address" required autocomplete="email">
-            <input type="password" id="login-password" placeholder="Password" required autocomplete="current-password">
-            <button type="submit">Sign in</button>
-            <p class="error" id="login-error"></p>
-        </form>
-
-        <form id="register-form" class="auth-form">
-            <input type="email" id="register-email" placeholder="Email address" required autocomplete="email">
-            <input type="password" id="register-password" placeholder="Create a password" required minlength="8" autocomplete="new-password">
-            <button type="submit">Create account</button>
-            <p class="error" id="register-error"></p>
-        </form>
-
-        <form id="admin-form" class="auth-form">
-            <input type="email" id="admin-email" placeholder="Admin email address" required autocomplete="email">
-            <input type="password" id="admin-password" placeholder="Create a password" required minlength="8" autocomplete="new-password">
-            <input type="password" id="admin-secret" placeholder="Admin secret key" required autocomplete="off">
-            <button type="submit">Register as admin</button>
-            <p class="error" id="admin-error"></p>
-        </form>
+        <div id="ground"></div>
     </div>
 
-    <script src="../js/config.js"></script>
-    <script src="../js/api.js"></script>
-    <script src="../js/auth.js"></script>
+    <script src="../js/config.js?v=2"></script>
+    <script src="../js/api.js?v=2"></script>
+    <script src="../js/critters.js?v=2"></script>
+    <script>
+        document.getElementById("brand-bug").innerHTML = Critters.critter("ladybug", "#EF476F", { size: 44 });
+        document.getElementById("ground").innerHTML = Critters.ground();
+        document.getElementById("login-critters").innerHTML =
+            '<div class="bob">' + Critters.critter("snail", "#FFD166", { size: 96 }) + "</div>" +
+            '<div class="jiggle">' + Critters.critter("ladybug", "#EF476F", { size: 120 }) + "</div>" +
+            '<div class="bob" style="animation-delay:-1.2s">' + Critters.critter("beetle", "#48CAE4", { size: 96 }) + "</div>";
+    </script>
+    <script src="../js/auth.js?v=2"></script>
 </body>
 </html>
