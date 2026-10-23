@@ -8,8 +8,9 @@ def _future(hours=48):
     return (datetime.now(timezone.utc) + timedelta(hours=hours)).isoformat()
 
 
-def _create(client, user, title="Task"):
-    r = client.post("/tasks", json={"title": title, "due_date": _future()}, headers=user["headers"])
+def _create(client, user, title="Task", assigned_to=None):
+    body = {"title": title, "due_date": _future(), "assigned_to": assigned_to}
+    r = client.post("/tasks", json=body, headers=user["headers"])
     assert r.status_code == 201, r.text
     return r.json()
 
@@ -34,12 +35,11 @@ def test_past_due_date_rejected_on_create(client, member):
     assert r.status_code == 422
 
 
-def test_overdue_tasks_still_list(client, member, admin):
+def test_overdue_tasks_still_list(client, member):
     task = _create(client, member)
     _make_overdue(task["id"])
     assert client.get("/tasks", headers=member["headers"]).status_code == 200
     assert client.get(f"/tasks/{task['id']}", headers=member["headers"]).status_code == 200
-    assert client.get("/admin/tasks", headers=admin["headers"]).status_code == 200
 
 
 def test_patch_rejects_null_required_fields(client, member):
@@ -64,45 +64,59 @@ def test_other_members_cannot_see_task(client, member, other_member):
     assert client.delete(f"/tasks/{task['id']}", headers=other_member["headers"]).status_code == 404
 
 
-def test_assignee_sees_and_updates_status_only(client, member, other_member, admin):
-    task = _create(client, member)
-    r = client.patch(
-        f"/admin/tasks/{task['id']}/assign",
-        json={"assigned_to": other_member["id"]},
-        headers=admin["headers"],
-    )
-    assert r.status_code == 200
-
+def test_assign_on_create(client, member, other_member):
+    task = _create(client, member, assigned_to=other_member["id"])
+    assert task["assigned_to"] == other_member["id"]
     tasks = client.get("/tasks", headers=other_member["headers"]).json()
     assert [t["id"] for t in tasks] == [task["id"]]
+
+
+def test_assignee_sees_and_updates_status_only(client, member, other_member):
+    task = _create(client, member, assigned_to=other_member["id"])
 
     r = client.patch(f"/tasks/{task['id']}", json={"status": "in_progress"}, headers=other_member["headers"])
     assert r.status_code == 200
     assert r.json()["status"] == "in_progress"
 
-    r = client.patch(f"/tasks/{task['id']}", json={"title": "hijack"}, headers=other_member["headers"])
-    assert r.status_code == 403
+    for change in ({"title": "hijack"}, {"assigned_to": member["id"]}):
+        r = client.patch(f"/tasks/{task['id']}", json=change, headers=other_member["headers"])
+        assert r.status_code == 403, change
     assert client.delete(f"/tasks/{task['id']}", headers=other_member["headers"]).status_code == 403
 
 
-def test_admin_can_update_and_delete_any_task(client, member, admin):
-    task = _create(client, member)
-    r = client.patch(f"/tasks/{task['id']}", json={"status": "completed"}, headers=admin["headers"])
+def test_creator_reassigns_and_unassigns(client, member, other_member, outsider):
+    task = _create(client, member, assigned_to=other_member["id"])
+    url = f"/tasks/{task['id']}"
+    r = client.patch(url, json={"assigned_to": outsider["id"]}, headers=member["headers"])
     assert r.status_code == 200
-    assert client.delete(f"/tasks/{task['id']}", headers=admin["headers"]).status_code == 204
-
-
-def test_admin_can_unassign(client, member, other_member, admin):
-    task = _create(client, member)
-    url = f"/admin/tasks/{task['id']}/assign"
-    client.patch(url, json={"assigned_to": other_member["id"]}, headers=admin["headers"])
-    r = client.patch(url, json={"assigned_to": None}, headers=admin["headers"])
-    assert r.status_code == 200
-    assert r.json()["assigned_to"] is None
     assert client.get("/tasks", headers=other_member["headers"]).json() == []
 
+    r = client.patch(url, json={"assigned_to": None}, headers=member["headers"])
+    assert r.status_code == 200
+    assert r.json()["assigned_to"] is None
+    assert client.get("/tasks", headers=outsider["headers"]).json() == []
 
-def test_assign_to_unknown_user_is_404(client, member, admin):
+
+def test_reassigning_resets_reminder(client, member, other_member):
     task = _create(client, member)
-    r = client.patch(f"/admin/tasks/{task['id']}/assign", json={"assigned_to": 9999}, headers=admin["headers"])
+    db = SessionLocal()
+    db.get(Task, task["id"]).reminder_sent_at = datetime.now(timezone.utc)
+    db.commit()
+    db.close()
+    client.patch(f"/tasks/{task['id']}", json={"assigned_to": other_member["id"]}, headers=member["headers"])
+    db = SessionLocal()
+    assert db.get(Task, task["id"]).reminder_sent_at is None
+    db.close()
+
+
+def test_assign_to_unknown_user_is_404(client, member):
+    r = client.post("/tasks", json={"title": "x", "due_date": _future(), "assigned_to": 9999}, headers=member["headers"])
     assert r.status_code == 404
+    task = _create(client, member)
+    r = client.patch(f"/tasks/{task['id']}", json={"assigned_to": 9999}, headers=member["headers"])
+    assert r.status_code == 404
+
+
+def test_creator_deletes(client, member):
+    task = _create(client, member)
+    assert client.delete(f"/tasks/{task['id']}", headers=member["headers"]).status_code == 204

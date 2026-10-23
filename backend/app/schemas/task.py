@@ -27,6 +27,7 @@ class TaskCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: str | None = None
     due_date: datetime
+    assigned_to: int | None = None
 
     @field_validator("due_date")
     @classmethod
@@ -54,6 +55,7 @@ class TaskUpdate(BaseModel):
     description: str | None = None
     due_date: datetime | None = None
     status: TaskStatus | None = None
+    assigned_to: int | None = None
 
     @field_validator("due_date")
     @classmethod
@@ -66,7 +68,3 @@ class TaskUpdate(BaseModel):
             if field in self.model_fields_set and getattr(self, field) is None:
                 raise ValueError(f"{field} cannot be null")
         return self
-
-
-class TaskAssign(BaseModel):
-    assigned_to: int | None

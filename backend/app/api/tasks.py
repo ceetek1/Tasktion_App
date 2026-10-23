@@ -10,19 +10,21 @@ from app.api.auth import get_current_user
 router = APIRouter()
 
 
-def _is_admin(user: User) -> bool:
-    return user.role == "admin"
-
-
 def _get_visible_task(db: Session, task_id: int, user: User) -> Task:
-    """Admins see every task; members see tasks they created or were assigned."""
-    query = db.query(Task).filter(Task.id == task_id)
-    if not _is_admin(user):
-        query = query.filter(or_(Task.user_id == user.id, Task.assigned_to == user.id))
-    task = query.first()
+    """Members see tasks they created or were assigned."""
+    task = (
+        db.query(Task)
+        .filter(Task.id == task_id, or_(Task.user_id == user.id, Task.assigned_to == user.id))
+        .first()
+    )
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+def _check_assignee(db: Session, user_id: int | None) -> None:
+    if user_id is not None and db.get(User, user_id) is None:
+        raise HTTPException(status_code=404, detail="User not found")
 
 
 @router.get("/tasks", response_model=list[TaskRead])
@@ -57,11 +59,13 @@ def create_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _check_assignee(db, task.assigned_to)
     new_task = Task(
         title=task.title,
         description=task.description,
         due_date=task.due_date,
         user_id=current_user.id,
+        assigned_to=task.assigned_to,
     )
     db.add(new_task)
     db.commit()
@@ -79,14 +83,18 @@ def update_task(
     existing_task = _get_visible_task(db, task_id, current_user)
 
     task_data = task_update.model_dump(exclude_unset=True)
-    can_edit_all = _is_admin(current_user) or existing_task.user_id == current_user.id
-    if not can_edit_all and set(task_data) - {"status"}:
+    if existing_task.user_id != current_user.id and set(task_data) - {"status"}:
         raise HTTPException(status_code=403, detail="Assignees can only update task status")
 
-    for key, value in task_data.items():
-        setattr(existing_task, key, value)
+    if "assigned_to" in task_data:
+        _check_assignee(db, task_data["assigned_to"])
+        if task_data["assigned_to"] != existing_task.assigned_to:
+            # New recipient should get their own reminder
+            existing_task.reminder_sent_at = None
     if "due_date" in task_data:
         existing_task.reminder_sent_at = None
+    for key, value in task_data.items():
+        setattr(existing_task, key, value)
     db.commit()
     db.refresh(existing_task)
     return existing_task
@@ -99,7 +107,7 @@ def delete_task(
     current_user: User = Depends(get_current_user),
 ):
     existing_task = _get_visible_task(db, task_id, current_user)
-    if not _is_admin(current_user) and existing_task.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Only the task creator or an admin can delete it")
+    if existing_task.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the task creator can delete it")
     db.delete(existing_task)
     db.commit()

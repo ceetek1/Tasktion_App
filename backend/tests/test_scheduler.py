@@ -24,9 +24,9 @@ def _add_task(owner_id, hours, assigned_to=None, status="pending"):
 
 def _enable_email(monkeypatch):
     for key, value in {
-        "MAILTRAP_HOST": "smtp.test",
-        "MAILTRAP_USER": "user",
-        "MAILTRAP_PASSWORD": "pass",
+        "SMTP_HOST": "smtp.test",
+        "SMTP_USER": "user",
+        "SMTP_PASSWORD": "pass",
     }.items():
         monkeypatch.setattr(settings, key, value)
     sent = []

@@ -1,9 +1,4 @@
 (function () {
-    if (!localStorage.getItem("token")) {
-        window.location.href = "login.html";
-        return;
-    }
-
     var C = window.Critters;
     var NAMES = ["Sir Wiggles", "Captain Crumb", "Noodle", "Beans McGee"];
     var BUBBLES = ["", "hi!! hi!! HI!!", "is that... me?", "feed me tasks pls", "LET'S GOOO!"];
@@ -192,9 +187,7 @@
         })
         .then(render)
         .catch(function (err) {
-            if (err && err.status === 401) {
-                localStorage.removeItem("token");
-                window.location.href = "login.html";
-            }
+            if (err && err.status === 401) Session.signOut();
+            else if (err && err.status === 403) window.location.href = "login.html";
         });
 })();

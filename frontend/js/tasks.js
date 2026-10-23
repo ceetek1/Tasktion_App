@@ -1,10 +1,4 @@
 (function () {
-    var token = localStorage.getItem("token");
-    if (!token) {
-        window.location.href = "login.html";
-        return;
-    }
-
     var C = window.Critters;
     var taskList = document.getElementById("task-list");
     if (!taskList) return;
@@ -26,7 +20,6 @@
         user: null,
         buddy: null,
         tasks: [],
-        allTasks: [],
         users: [],
         filter: "all",
         editing: null,
@@ -37,8 +30,7 @@
         loading: document.getElementById("task-loading"),
         empty: document.getElementById("task-empty"),
         filters: document.getElementById("filters"),
-        adminSection: document.getElementById("admin-section"),
-        adminList: document.getElementById("admin-task-list"),
+        inviteDialog: document.getElementById("invite-dialog"),
         taskDialog: document.getElementById("task-dialog"),
         taskForm: document.getElementById("task-form"),
         detailDialog: document.getElementById("detail-dialog"),
@@ -106,39 +98,41 @@
         return (task.status === "completed" ? "Done · due " : "") + formatWhen(due);
     }
 
-    function userEmail(id) {
+    function displayName(u) { return u.display_name || u.email.split("@")[0]; }
+
+    function userName(id) {
         var u = state.users.filter(function (x) { return x.id === id; })[0];
-        return u ? u.email : null;
+        return u ? displayName(u) : null;
     }
 
+    // Only the creator edits, reassigns or deletes; the assignee moves the status along
     function isMine(task) { return state.user && task.user_id === state.user.id; }
-    function isAdmin() { return state.user && state.user.role === "admin"; }
-    function canEdit(task) { return isMine(task) || isAdmin(); }
 
     function whoLabel(task) {
         var me = state.user && state.user.id;
         if (task.assigned_to === me && task.user_id === me) return "You";
-        if (task.assigned_to === me) return "Assigned to you" + (userEmail(task.user_id) ? " by " + userEmail(task.user_id) : "");
-        if (task.assigned_to) return "Assigned to " + (userEmail(task.assigned_to) || "a teammate");
-        if (task.user_id === me) return "You (not assigned)";
-        return "Created by " + (userEmail(task.user_id) || "a teammate");
+        if (task.assigned_to === me) return "Given to you" + (userName(task.user_id) ? " by " + userName(task.user_id) : "");
+        if (task.assigned_to) return "Given to " + (userName(task.assigned_to) || "a friend");
+        if (task.user_id === me) return "You (nobody on it)";
+        return "Made by " + (userName(task.user_id) || "a friend");
     }
 
     function findTask(id) {
-        return state.tasks.concat(state.allTasks).filter(function (t) { return t.id === id; })[0];
+        return state.tasks.filter(function (t) { return t.id === id; })[0];
     }
 
     function replaceTask(updated) {
-        [state.tasks, state.allTasks].forEach(function (list) {
-            for (var i = 0; i < list.length; i++) {
-                if (list[i].id === updated.id) list[i] = updated;
-            }
-        });
+        for (var i = 0; i < state.tasks.length; i++) {
+            if (state.tasks[i].id === updated.id) state.tasks[i] = updated;
+        }
     }
 
     function handleAuthError(err) {
         if (err && err.status === 401) {
-            localStorage.removeItem("token");
+            Session.signOut();
+            return true;
+        }
+        if (err && err.status === 403 && err.message === "invite_required") {
             window.location.href = "login.html";
             return true;
         }
@@ -215,8 +209,7 @@
         });
     }
 
-    function taskCard(task, opts) {
-        opts = opts || {};
+    function taskCard(task) {
         var done = task.status === "completed";
         var overdue = C.isOverdue(task);
         var statusDef = STATUS.filter(function (s) { return s.id === task.status; })[0] || STATUS[0];
@@ -246,7 +239,6 @@
         if (!done) meta.appendChild(el("span", { "class": "tag tag-xp", text: "+" + C.XP_PER_TASK + " XP" }));
         body.appendChild(meta);
 
-        if (opts.admin) body.appendChild(assignControl(task));
         li.appendChild(body);
 
         if (overdue) li.appendChild(el("div", { "class": "peeker peek", html: C.critter("beetle", "#48CAE4", { size: 70, grumpy: true }) }));
@@ -258,12 +250,7 @@
         var id = "assign-" + task.id;
         wrap.appendChild(el("label", { "for": id, "class": "sr-only", text: "Assign " + task.title + " to" }));
         var select = el("select", { id: id, "class": "assign-select" });
-        select.appendChild(el("option", { value: "", text: "Nobody yet" }));
-        state.users.forEach(function (u) {
-            var opt = el("option", { value: String(u.id), text: u.email + (u.role === "admin" ? " (admin)" : "") });
-            if (u.id === task.assigned_to) opt.selected = true;
-            select.appendChild(opt);
-        });
+        fillAssignees(select, task.assigned_to);
         select.addEventListener("change", function () {
             assign(task.id, select.value ? parseInt(select.value, 10) : null);
         });
@@ -314,29 +301,15 @@
         }
         shown.forEach(function (t) { taskList.appendChild(taskCard(t)); });
 
-        if (isAdmin()) {
-            els.adminSection.classList.remove("hidden");
-            els.adminList.innerHTML = "";
-            if (!state.allTasks.length) {
-                els.adminList.appendChild(el("li", { "class": "loading", text: "No tasks in the jar yet." }));
-            }
-            state.allTasks.forEach(function (t) { els.adminList.appendChild(taskCard(t, { admin: true })); });
-        } else {
-            els.adminSection.classList.add("hidden");
-        }
-
         if (state.detailId && els.detailDialog.open) renderDetail();
     }
 
     // ---------- Data ----------
     async function loadTasks() {
         try {
-            state.tasks = await fetchTasks();
-            if (isAdmin()) {
-                var results = await Promise.all([fetchAllTasks(), fetchUsers()]);
-                state.allTasks = results[0];
-                state.users = results[1];
-            }
+            var results = await Promise.all([fetchTasks(), fetchUsers()]);
+            state.tasks = results[0];
+            state.users = results[1];
             renderTasks();
         } catch (err) {
             if (handleAuthError(err)) return;
@@ -348,7 +321,7 @@
         var task = findTask(id);
         if (!task) return;
         var next = task.status === "completed" ? "pending" : "completed";
-        if (!isMine(task) && !isAdmin() && task.assigned_to !== state.user.id) return;
+        if (!isMine(task) && task.assigned_to !== state.user.id) return;
         try {
             var updated = await updateTask(id, { status: next });
             replaceTask(updated);
@@ -382,10 +355,10 @@
 
     async function assign(id, userId) {
         try {
-            var updated = await assignTask(id, userId);
+            var updated = await updateTask(id, { assigned_to: userId });
             replaceTask(updated);
-            await loadTasks();
-            toast("Assigned!", userId ? "Sent to " + (userEmail(userId) || "a teammate") : "Nobody's on it now.");
+            renderTasks();
+            toast("Handed over!", userId ? (userId === state.user.id ? "It's yours now." : "Sent to " + (userName(userId) || "a friend")) : "Nobody's on it now.");
         } catch (err) {
             if (handleAuthError(err)) return;
             toast("Oops!", err.message, true);
@@ -411,6 +384,16 @@
 
     function pad(n) { return String(n).padStart(2, "0"); }
 
+    function fillAssignees(select, selectedId) {
+        select.innerHTML = "";
+        select.appendChild(el("option", { value: "", text: "Nobody yet" }));
+        state.users.forEach(function (u) {
+            var opt = el("option", { value: String(u.id), text: u.id === state.user.id ? "Me, obviously" : displayName(u) });
+            if (u.id === selectedId) opt.selected = true;
+            select.appendChild(opt);
+        });
+    }
+
     function openForm(task) {
         state.editing = task ? task.id : null;
         f.heading.textContent = task ? "Tweak this task" : "Drop a task in the jar";
@@ -425,15 +408,7 @@
         [f.title, f.date, f.time].forEach(function (i) { i.removeAttribute("aria-invalid"); });
         f.jar.textContent = "feed us!";
 
-        var showAssign = isAdmin() && !task;
-        f.assignField.classList.toggle("hidden", !showAssign);
-        if (showAssign) {
-            f.assignee.innerHTML = "";
-            f.assignee.appendChild(el("option", { value: "", text: "Nobody yet" }));
-            state.users.forEach(function (u) {
-                f.assignee.appendChild(el("option", { value: String(u.id), text: u.id === state.user.id ? "Me, obviously" : u.email }));
-            });
-        }
+        fillAssignees(f.assignee, task ? task.assigned_to : state.user.id);
 
         if (els.detailDialog.open) els.detailDialog.close();
         els.taskDialog.showModal();
@@ -491,13 +466,15 @@
         try {
             var title = f.title.value.trim();
             var description = f.desc.value.trim() || null;
+            var assignee = f.assignee.value ? parseInt(f.assignee.value, 10) : null;
             if (state.editing) {
-                await updateTask(state.editing, { title: title, description: description, due_date: when.toISOString() });
+                await updateTask(state.editing, { title: title, description: description, due_date: when.toISOString(), assigned_to: assignee });
                 toast("Saved!", '"' + title + '" got a makeover.');
             } else {
-                var created = await createTask(title, description, when);
-                if (f.assignee.value && isAdmin()) await assignTask(created.id, parseInt(f.assignee.value, 10));
-                toast("Plop!", '"' + title + '" is in the jar.');
+                await createTask(title, description, when, assignee);
+                toast("Plop!", assignee && assignee !== state.user.id
+                    ? '"' + title + '" is on ' + (userName(assignee) || "your friend") + "'s list."
+                    : '"' + title + '" is in the jar.');
             }
             els.taskDialog.close();
             await loadTasks();
@@ -525,7 +502,7 @@
         var d = els.detail;
         var done = task.status === "completed";
         var statusDef = STATUS.filter(function (s) { return s.id === task.status; })[0] || STATUS[0];
-        var canChangeStatus = canEdit(task) || task.assigned_to === state.user.id;
+        var canChangeStatus = isMine(task) || task.assigned_to === state.user.id;
         d.innerHTML = "";
         if (done) d.insertAdjacentHTML("beforeend", C.confetti(22));
 
@@ -574,7 +551,7 @@
         juicy.appendChild(el("p", { text: task.description || "No details. Very mysterious." }));
         d.appendChild(juicy);
 
-        if (canEdit(task)) {
+        if (isMine(task)) {
             var actions = el("div", { "class": "detail-actions" });
             if (confirming) {
                 var box = el("div", { "class": "confirm", role: "alert" });
@@ -602,11 +579,52 @@
                 del.appendChild(document.createTextNode("Delete"));
                 actions.appendChild(edit);
                 actions.appendChild(del);
-                if (isAdmin()) actions.appendChild(assignControl(task));
+                actions.appendChild(assignControl(task));
             }
             d.appendChild(actions);
         }
     }
+
+    // ---------- Invite a friend ----------
+    var inv = {
+        url: document.getElementById("invite-url"),
+        share: document.getElementById("invite-share"),
+        copy: document.getElementById("invite-copy"),
+        line: document.getElementById("invite-line")
+    };
+
+    async function openInvite() {
+        inv.url.value = "";
+        inv.line.textContent = "Making a fresh link…";
+        inv.share.classList.toggle("hidden", !navigator.share);
+        [inv.share, inv.copy].forEach(function (b) { b.disabled = true; });
+        els.inviteDialog.showModal();
+        try {
+            var invite = await createInvite();
+            inv.url.value = invite.url;
+            inv.line.textContent = "Works once, for one friend, until " +
+                new Date(invite.expires_at).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }) + ".";
+            [inv.share, inv.copy].forEach(function (b) { b.disabled = false; });
+        } catch (err) {
+            if (handleAuthError(err)) return;
+            inv.line.textContent = "Couldn't make a link: " + err.message;
+        }
+    }
+
+    inv.share.addEventListener("click", function () {
+        navigator.share({ title: "Join me on Tasktion", text: "Come squash tasks with me on Tasktion!", url: inv.url.value })
+            .catch(function () { /* share sheet dismissed */ });
+    });
+    inv.copy.addEventListener("click", async function () {
+        try {
+            await navigator.clipboard.writeText(inv.url.value);
+            toast("Copied!", "Paste it to your friend.");
+        } catch (e) {
+            inv.url.select();
+            toast("Select and copy", "Your browser blocked copying, so the link is highlighted.", true);
+        }
+    });
+    document.getElementById("invite-btn").addEventListener("click", openInvite);
 
     // ---------- Wiring ----------
     document.getElementById("add-task-btn").addEventListener("click", function () { openForm(null); });
@@ -614,7 +632,7 @@
     document.querySelectorAll("[data-close]").forEach(function (b) {
         b.addEventListener("click", function () { b.closest("dialog").close(); });
     });
-    [els.taskDialog, els.detailDialog].forEach(function (dlg) {
+    [els.taskDialog, els.detailDialog, els.inviteDialog].forEach(function (dlg) {
         // Click on the dimmed backdrop closes the sheet
         dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); });
     });
@@ -629,9 +647,15 @@
                 window.location.href = "onboarding.html";
                 return;
             }
-            document.getElementById("user-email").textContent = user.email;
-            document.getElementById("user-role").textContent = user.role === "admin" ? "Admin · Chief Bug Boss" : "Bug wrangler";
-            document.getElementById("avatar").textContent = user.email.charAt(0);
+            document.getElementById("user-email").textContent = displayName(user);
+            document.getElementById("user-role").textContent = user.email;
+            var avatar = document.getElementById("avatar");
+            if (user.avatar_url) {
+                avatar.textContent = "";
+                avatar.appendChild(el("img", { src: user.avatar_url, alt: "", referrerpolicy: "no-referrer" }));
+            } else {
+                avatar.textContent = displayName(user).charAt(0);
+            }
             return loadTasks();
         })
         .catch(function (err) {
