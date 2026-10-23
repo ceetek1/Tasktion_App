@@ -1,7 +1,7 @@
 from app.core.database import Base
-from sqlalchemy import ForeignKey, CheckConstraint
+from sqlalchemy import DateTime, ForeignKey, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from datetime import datetime, timezone
+from datetime import datetime
 
 
 class Task(Base):
@@ -13,10 +13,11 @@ class Task(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column()
     description: Mapped[str | None] = mapped_column(nullable=True)
-    due_date: Mapped[datetime] = mapped_column()
+    due_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(default="pending", server_default="pending")
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     assigned_to: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     owner = relationship("User", foreign_keys=[user_id], back_populates="created_tasks")
     assignee = relationship("User", foreign_keys=[assigned_to], back_populates="assigned_tasks")
