@@ -4,10 +4,23 @@ function apiUrl(path) {
     return API_BASE ? `${API_BASE}${path}` : path;
 }
 
-async function apiRequest(method, path, body = null) {
+function formatError(data, fallback) {
+    if (!data || !data.detail) return fallback;
+    if (Array.isArray(data.detail)) {
+        // FastAPI validation errors: [{loc, msg, ...}]
+        return data.detail.map(function (d) {
+            var field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : "";
+            var msg = (d.msg || "").replace(/^Value error, /, "");
+            return field && field !== "body" ? field + ": " + msg : msg;
+        }).join("; ");
+    }
+    return String(data.detail);
+}
+
+async function apiRequest(method, path, body = null, extraHeaders = {}) {
     const options = {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: Object.assign({ "Content-Type": "application/json" }, extraHeaders),
     };
     if (body) options.body = JSON.stringify(body);
 
@@ -21,7 +34,7 @@ async function apiRequest(method, path, body = null) {
     const contentType = response.headers.get("content-type") || "";
     const data = contentType.includes("application/json") ? await response.json() : null;
     if (!response.ok) {
-        const error = new Error((data && data.detail) || response.statusText || "Request failed");
+        const error = new Error(formatError(data, response.statusText || "Request failed"));
         error.status = response.status;
         throw error;
     }
@@ -38,22 +51,7 @@ async function login(email, password) {
 }
 
 async function registerAdmin(email, password, adminSecret) {
-    const response = await fetch(apiUrl("/auth/register-admin"), {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "x-admin-secret": adminSecret,
-        },
-        body: JSON.stringify({ email, password }),
-    });
-    const contentType = response.headers.get("content-type") || "";
-    const data = contentType.includes("application/json") ? await response.json() : null;
-    if (!response.ok) {
-        const error = new Error((data && data.detail) || "Registration failed");
-        error.status = response.status;
-        throw error;
-    }
-    return data;
+    return apiRequest("POST", "/auth/register-admin", { email, password }, { "x-admin-secret": adminSecret });
 }
 
 async function fetchCurrentUser() {
