@@ -2,10 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.task import Task
-from app.schemas.task import TaskRead
+from app.schemas.task import TaskAssign, TaskRead
 from app.models.user import User
 from app.api.auth import require_admin
-from app.schemas.task import TaskAssign
 
 router = APIRouter()
 
@@ -37,10 +36,14 @@ def assign_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    user = db.query(User).filter(User.id == assignment.assigned_to).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    if assignment.assigned_to is not None:
+        user = db.query(User).filter(User.id == assignment.assigned_to).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
+    if task.assigned_to != assignment.assigned_to:
+        # New recipient should get their own reminder
+        task.reminder_sent_at = None
     task.assigned_to = assignment.assigned_to
     db.commit()
     db.refresh(task)
