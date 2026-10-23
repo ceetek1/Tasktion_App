@@ -8,9 +8,13 @@ logger = logging.getLogger(__name__)
 
 def send_email(to_address: str, subject: str, body: str) -> bool:
     """Send an email via SMTP. Returns True on success, False on failure."""
+    if not settings.email_enabled:
+        logger.info("Email is disabled because SMTP is not configured")
+        return False
+
     message = EmailMessage()
     message["Subject"] = subject
-    message["From"] = "noreply@taskflow.com"
+    message["From"] = settings.EMAIL_FROM
     message["To"] = to_address
     message.set_content(body)
 

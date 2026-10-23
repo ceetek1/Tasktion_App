@@ -1,5 +1,5 @@
 from app.core.database import Base
-from sqlalchemy import CheckConstraint
+from sqlalchemy import CheckConstraint, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
@@ -7,6 +7,7 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint("role IN ('admin', 'member')", name="ck_user_role"),
+        Index("uq_users_email_lower", text("lower(email)"), unique=True),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

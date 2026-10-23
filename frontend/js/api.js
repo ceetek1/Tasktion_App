@@ -1,9 +1,26 @@
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = (window.TASKTION_API_BASE || "").replace(/\/$/, "");
 
-async function apiRequest(method, path, body = null) {
+function apiUrl(path) {
+    return API_BASE ? `${API_BASE}${path}` : path;
+}
+
+function formatError(data, fallback) {
+    if (!data || !data.detail) return fallback;
+    if (Array.isArray(data.detail)) {
+        // FastAPI validation errors: [{loc, msg, ...}]
+        return data.detail.map(function (d) {
+            var field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : "";
+            var msg = (d.msg || "").replace(/^Value error, /, "");
+            return field && field !== "body" ? field + ": " + msg : msg;
+        }).join("; ");
+    }
+    return String(data.detail);
+}
+
+async function apiRequest(method, path, body = null, extraHeaders = {}) {
     const options = {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: Object.assign({ "Content-Type": "application/json" }, extraHeaders),
     };
     if (body) options.body = JSON.stringify(body);
 
@@ -12,11 +29,14 @@ async function apiRequest(method, path, body = null) {
         options.headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE}${path}`, options);
+    const response = await fetch(apiUrl(path), options);
     if (response.status === 204) return null;
-    const data = await response.json();
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json") ? await response.json() : null;
     if (!response.ok) {
-        throw new Error(data.detail || "Request failed");
+        const error = new Error(formatError(data, response.statusText || "Request failed"));
+        error.status = response.status;
+        throw error;
     }
     return data;
 }
@@ -31,19 +51,11 @@ async function login(email, password) {
 }
 
 async function registerAdmin(email, password, adminSecret) {
-    const response = await fetch(`${API_BASE}/auth/register-admin`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "x-admin-secret": adminSecret,
-        },
-        body: JSON.stringify({ email, password }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-        throw new Error(data.detail || "Registration failed");
-    }
-    return data;
+    return apiRequest("POST", "/auth/register-admin", { email, password }, { "x-admin-secret": adminSecret });
+}
+
+async function fetchCurrentUser() {
+    return apiRequest("GET", "/auth/me");
 }
 
 // Tasks
