@@ -93,20 +93,21 @@
             return;
         }
 
-        // Decode token to get user info (simple base64 decode)
-        try {
-            var payload = token.split(".")[1];
-            var padding = 4 - payload.length % 4;
-            if (padding !== 4) payload += "=".repeat(padding);
-            var decoded = JSON.parse(atob(payload));
-            var userEmailEl = document.getElementById("user-email");
-            if (userEmailEl) {
-                userEmailEl.textContent = "User #" + decoded.sub;
-            }
-        } catch (e) {
-            // Token decode failed, show generic label
-            var userEmailEl = document.getElementById("user-email");
-            if (userEmailEl) userEmailEl.textContent = "Logged in";
+        var userEmailEl = document.getElementById("user-email");
+        if (userEmailEl) {
+            userEmailEl.textContent = "Loading...";
+            fetchCurrentUser()
+                .then(function (user) {
+                    userEmailEl.textContent = user.email + " (" + user.role + ")";
+                })
+                .catch(function (err) {
+                    if (err.status === 401) {
+                        localStorage.removeItem("token");
+                        window.location.href = "login.html";
+                        return;
+                    }
+                    userEmailEl.textContent = "Logged in";
+                });
         }
 
         logoutBtn.addEventListener("click", function () {

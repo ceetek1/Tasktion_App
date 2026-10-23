@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.task import Task
 from app.models.user import User
@@ -14,6 +15,10 @@ scheduler = AsyncIOScheduler()
 
 async def send_reminders():
     """Query tasks due within 24 hours and send email reminders to owners."""
+    if not settings.email_enabled:
+        logger.info("Email reminders skipped because SMTP is not configured")
+        return
+
     now = datetime.now(timezone.utc)
     reminder_window = now + timedelta(hours=24)
 
@@ -55,5 +60,17 @@ async def send_reminders():
 
 def configure_scheduler():
     """Register scheduled jobs. Called during FastAPI startup."""
-    scheduler.add_job(send_reminders, "interval", hours=6, next_run_time=None)
+    if not settings.SCHEDULER_ENABLED:
+        logger.info("Scheduler disabled by configuration")
+        return False
+
+    scheduler.add_job(
+        send_reminders,
+        "interval",
+        hours=6,
+        id="send_reminders",
+        replace_existing=True,
+        next_run_time=None,
+    )
     logger.info("Scheduler configured: send_reminders runs every 6 hours")
+    return True

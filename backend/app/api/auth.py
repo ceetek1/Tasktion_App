@@ -57,24 +57,27 @@ def logout_user():
     return {"message": "Successfully logged out. Delete your stored token."}
 
 
-
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         user_id: str = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
-    except JWTError:
+        user_id_int = int(user_id)
+    except (JWTError, ValueError):
         raise HTTPException(status_code=401, detail="Invalid token")
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    user = db.query(User).filter(User.id == user_id_int).first()
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
     return user
+
+
+@router.get("/auth/me", response_model=UserRead)
+def read_current_user(current_user: User = Depends(get_current_user)):
+    return current_user
 
 
 def require_admin(current_user: User = Depends(get_current_user)):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Access denied. Admin privileges required.")
     return current_user
-
-    

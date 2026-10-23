@@ -13,6 +13,7 @@
     var taskError = document.getElementById("task-error");
     var adminSection = document.getElementById("admin-section");
     var adminTaskList = document.getElementById("admin-task-list");
+    var assignTaskApi = window.assignTask;
 
     if (!taskList) return;
 
@@ -56,6 +57,11 @@
             var tasks = await fetchTasks();
             renderTasks(tasks, taskList, false);
         } catch (err) {
+            if (err.status === 401) {
+                localStorage.removeItem("token");
+                window.location.href = "login.html";
+                return;
+            }
             taskList.innerHTML = "<p>Failed to load tasks.</p>";
         }
 
@@ -88,13 +94,14 @@
 
             var statusClass = "status-" + task.status.replace(" ", "_");
             var dueDateStr = new Date(task.due_date).toLocaleDateString();
+            var statusLabel = task.status.replace("_", " ");
 
             card.innerHTML =
                 '<div class="task-info">' +
                     '<h3>' + escapeHtml(task.title) + '</h3>' +
                     (task.description ? '<p>' + escapeHtml(task.description) + '</p>' : '') +
                     '<div class="task-meta">' +
-                        '<span class="task-status ' + statusClass + '">' + escapeHtml(task.status) + '</span>' +
+                        '<span class="task-status ' + statusClass + '">' + escapeHtml(statusLabel) + '</span>' +
                         '<span>Due: ' + dueDateStr + '</span>' +
                     '</div>' +
                 '</div>' +
@@ -114,33 +121,34 @@
             return;
         }
 
-        var selectOptions = '<option value="">Assign to...</option>';
-        usersCache.forEach(function (u) {
-            selectOptions += '<option value="' + u.id + '">' + escapeHtml(u.email) + ' (' + u.role + ')</option>';
-        });
-
         tasks.forEach(function (task) {
             var card = document.createElement("div");
             card.className = "task-card";
 
             var statusClass = "status-" + task.status.replace(" ", "_");
             var dueDateStr = new Date(task.due_date).toLocaleDateString();
+            var statusLabel = task.status.replace("_", " ");
             var assignedLabel = task.assigned_to ?
                 (usersCache.find(function(u) { return u.id === task.assigned_to; }) || {}).email || "User #" + task.assigned_to :
                 "Unassigned";
+            var assignmentOptions = '<option value="">Assign to...</option>';
+            usersCache.forEach(function (u) {
+                var selected = u.id === task.assigned_to ? " selected" : "";
+                assignmentOptions += '<option value="' + u.id + '"' + selected + '>' + escapeHtml(u.email) + ' (' + u.role + ')</option>';
+            });
 
             card.innerHTML =
                 '<div class="task-info">' +
                     '<h3>' + escapeHtml(task.title) + '</h3>' +
                     (task.description ? '<p>' + escapeHtml(task.description) + '</p>' : '') +
                     '<div class="task-meta">' +
-                        '<span class="task-status ' + statusClass + '">' + escapeHtml(task.status) + '</span>' +
+                        '<span class="task-status ' + statusClass + '">' + escapeHtml(statusLabel) + '</span>' +
                         '<span>Due: ' + dueDateStr + '</span>' +
                         '<span>Assigned: ' + escapeHtml(assignedLabel) + '</span>' +
                     '</div>' +
                 '</div>' +
                 '<div class="task-actions">' +
-                    '<select onchange="assignTask(' + task.id + ', this.value)" style="padding:6px 10px;border:1px solid var(--gray-300);border-radius:var(--radius);font-size:12px;">' + selectOptions + '</select>' +
+                    '<select onchange="assignTask(' + task.id + ', this.value)" style="padding:6px 10px;border:1px solid var(--gray-300);border-radius:var(--radius);font-size:12px;">' + assignmentOptions + '</select>' +
                     '<button class="edit-btn" onclick="toggleStatus(' + task.id + ', \'' + task.status + '\')">Cycle</button>' +
                     '<button class="delete-btn" onclick="removeTask(' + task.id + ')">Delete</button>' +
                 '</div>';
@@ -186,7 +194,7 @@
     window.assignTask = async function (taskId, userId) {
         if (!userId) return;
         try {
-            await assignTask(taskId, parseInt(userId));
+            await assignTaskApi(taskId, parseInt(userId, 10));
             await loadTasks();
         } catch (err) {
             alert("Failed to assign task: " + err.message);

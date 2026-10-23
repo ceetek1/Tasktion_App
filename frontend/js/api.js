@@ -1,4 +1,8 @@
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = (window.TASKTION_API_BASE || "").replace(/\/$/, "");
+
+function apiUrl(path) {
+    return API_BASE ? `${API_BASE}${path}` : path;
+}
 
 async function apiRequest(method, path, body = null) {
     const options = {
@@ -12,11 +16,14 @@ async function apiRequest(method, path, body = null) {
         options.headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE}${path}`, options);
+    const response = await fetch(apiUrl(path), options);
     if (response.status === 204) return null;
-    const data = await response.json();
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json") ? await response.json() : null;
     if (!response.ok) {
-        throw new Error(data.detail || "Request failed");
+        const error = new Error((data && data.detail) || response.statusText || "Request failed");
+        error.status = response.status;
+        throw error;
     }
     return data;
 }
@@ -31,7 +38,7 @@ async function login(email, password) {
 }
 
 async function registerAdmin(email, password, adminSecret) {
-    const response = await fetch(`${API_BASE}/auth/register-admin`, {
+    const response = await fetch(apiUrl("/auth/register-admin"), {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -39,11 +46,18 @@ async function registerAdmin(email, password, adminSecret) {
         },
         body: JSON.stringify({ email, password }),
     });
-    const data = await response.json();
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json") ? await response.json() : null;
     if (!response.ok) {
-        throw new Error(data.detail || "Registration failed");
+        const error = new Error((data && data.detail) || "Registration failed");
+        error.status = response.status;
+        throw error;
     }
     return data;
+}
+
+async function fetchCurrentUser() {
+    return apiRequest("GET", "/auth/me");
 }
 
 // Tasks
