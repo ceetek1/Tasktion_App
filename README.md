@@ -21,7 +21,7 @@ A private task app for you and your friends: hand each other tasks, see who's do
 - **Pydantic** — Request/response validation
 - **Supabase Auth** — Google, Microsoft and email sign-in (the API only verifies its tokens)
 - **python-jose** — JWT creation and verification
-- **APScheduler** — Background cron jobs
+- **APScheduler** — In-process reminder timer for always-on hosts (on Vercel, a GitHub Actions schedule calls `/cron/reminders` instead)
 - **smtplib** — Sending emails
 - **psycopg2-binary** — PostgreSQL driver
 
@@ -123,36 +123,46 @@ All sign-in goes through Supabase Auth. The callback URL every provider needs is
 5. **URL configuration:** set the Site URL to `APP_URL`, and add `<APP_URL>/pages/*` and `http://localhost:8000/pages/*` to the redirect URLs.
 6. Set `FIRST_MEMBER_EMAIL` to your own address. You join on your first sign-in; after that, use **Invite a friend** on the dashboard to make a single-use link (valid for `INVITE_EXPIRE_DAYS` days) for each friend. Anyone else who signs in sees "You need an invite".
 
-## Deployment
+## Deployment (Vercel)
 
-The FastAPI backend serves the static frontend from `frontend/`, so the app can be deployed as a single web service.
+The app deploys to Vercel's free Hobby plan as one project. Vercel serves everything in `public/` from its CDN, and runs the FastAPI app (found through the root `index.py`) as a single function for the API and `/js/config.js`.
 
-Typical production commands from the repository root:
+### 1. Database migrations (from your Mac)
+
+Vercel has no pre-deploy step, so run migrations yourself whenever a change adds one. Point `DATABASE_URL` at Supabase and run:
 
 ```bash
-pip install -r requirements.txt
 alembic -c backend/alembic.ini upgrade head
-uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --app-dir backend
 ```
 
-### Railway
+> ⚠️ Migration `c4d2e8f1a9b3` deletes all users and tasks from the old password-based version.
 
-`railway.json` runs the migrations before each deploy and starts one uvicorn worker. Create a Railway project from this GitHub repo (Hobby plan, so the app never sleeps and reminders run on time), add the environment variables below, then generate a domain under Settings → Networking and set `APP_URL` to it. Add that URL to Supabase's redirect URLs.
+### 2. Create the Vercel project
 
-### Other hosts
+1. At [vercel.com/new](https://vercel.com/new), import this GitHub repository. Vercel detects FastAPI on its own; leave the build settings empty.
+2. Under **Settings → Environment Variables**, add the variables below for Production (and Preview, if you want previews to work).
+3. Deploy. Every push to `main` then goes live automatically, and every pull request gets its own preview link.
+4. Set `APP_URL` to the production address (for example `https://tasktion.vercel.app`) and redeploy. Add `<APP_URL>/pages/*` to Supabase's redirect URLs and set it as the Site URL.
 
-For Procfile-based platforms, this repo includes:
+Required on Vercel: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `FIRST_MEMBER_EMAIL`, `APP_URL`, `CRON_SECRET`, `ENVIRONMENT=production`, plus the SMTP variables for reminder emails.
 
-```Procfile
-release: alembic -c backend/alembic.ini upgrade head
-web: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --app-dir backend
-```
+For `DATABASE_URL` on Vercel, use Supabase's **Transaction pooler** string (port `6543`). Serverless instances open a short connection per request, which the transaction pooler is built for. `postgres://` and `postgresql://` URLs are both accepted.
 
-Set `DATABASE_URL` to your deployed PostgreSQL connection string when available. `postgres://` and `postgresql://` URLs are accepted and normalized for the installed psycopg2 driver.
+For SMTP, Brevo's free plan (`smtp-relay.brevo.com`, port 587, 300 emails a day) only needs a verified sender address, not a domain.
 
-Set `ENVIRONMENT=production`, the Supabase variables, `FIRST_MEMBER_EMAIL` and `APP_URL`. If the frontend is hosted separately from the API, set `ALLOWED_ORIGINS` to the frontend origin list. Leave the SMTP variables blank to disable scheduled email reminders. For SMTP, Brevo's free plan (`smtp-relay.brevo.com`, port 587, 300 emails a day) only needs a verified sender address, not a domain.
+### 3. Hourly reminders (GitHub Actions)
 
-The reminder scheduler runs inside the web process. Run a single uvicorn worker, or set `SCHEDULER_ENABLED=false` on all but one process, to avoid duplicate jobs.
+Vercel stops the app between requests, so the in-process timer is switched off there automatically. Instead, `.github/workflows/reminders.yml` calls `POST /cron/reminders` every hour.
+
+1. Generate a secret: `python -c "import secrets; print(secrets.token_urlsafe(32))"`. Set it as `CRON_SECRET` on Vercel.
+2. In the GitHub repo, open **Settings → Secrets and variables → Actions**. Add the same value as the **secret** `CRON_SECRET`, and add a **variable** `APP_URL` with the production address.
+3. Run it once from the **Actions** tab (**Send reminders → Run workflow**). A green run that prints `{"email_enabled":true,...}` means it works.
+
+GitHub may start scheduled runs a few minutes late, and pauses them after 60 days without any repository activity. If that happens, re-enable the workflow from the Actions tab.
+
+### Running elsewhere
+
+On a host that keeps one process running, start it with the `Procfile` command. The in-process scheduler then sends reminders itself; run a single worker, or set `SCHEDULER_ENABLED=false` on all but one process, to avoid duplicate emails.
 
 ## Installing on an iPhone
 
@@ -173,13 +183,14 @@ Tasktion_App/
 │   ├── alembic/                     # Database migration history
 │   ├── .env                         # Local secrets (never commit)
 │   └── .env.example                 # Environment template
-├── frontend/                        # Client-side app
+├── public/                          # Client-side app (served by Vercel's CDN)
 │   ├── pages/                       # HTML pages (login, onboarding, dashboard)
 │   ├── css/                         # Stylesheets
 │   └── js/                          # Frontend scripts (session, api, auth, tasks)
 ├── requirements.txt                 # Python dependencies
 ├── Procfile                         # PaaS process commands
-├── railway.json                     # Railway build and deploy settings
+├── index.py                         # Vercel entrypoint (loads backend/app/main.py)
+├── .github/workflows/reminders.yml  # Hourly reminder trigger
 ├── .gitignore
 └── README.md
 ```
@@ -217,7 +228,8 @@ This folder contains all server-side components:
 | `SMTP_PASSWORD`       | Optional SMTP password                       |
 | `EMAIL_FROM`          | Sender address for reminder emails           |
 | `ALLOWED_ORIGINS`     | Comma-separated origins for separate frontend hosting |
-| `SCHEDULER_ENABLED`   | Enable or disable reminder scheduler         |
+| `SCHEDULER_ENABLED`   | In-process reminder timer (always off on Vercel) |
+| `CRON_SECRET`         | Bearer token for `POST /cron/reminders`      |
 
 ## License
 

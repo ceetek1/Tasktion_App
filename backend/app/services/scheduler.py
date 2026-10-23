@@ -17,11 +17,11 @@ REMINDER_WINDOW = timedelta(hours=24)
 REMINDER_INTERVAL_MINUTES = 60
 
 
-def send_reminders():
+def send_reminders() -> dict:
     """Email one reminder per task due within 24 hours: to the assignee, else the owner."""
     if not settings.email_enabled:
         logger.info("Email reminders skipped because SMTP is not configured")
-        return
+        return {"email_enabled": False, "due_soon": 0, "sent": 0}
 
     now = datetime.now(timezone.utc)
     reminder_window = now + REMINDER_WINDOW
@@ -66,9 +66,11 @@ def send_reminders():
             len(due_soon_tasks),
             sent,
         )
+        return {"email_enabled": True, "due_soon": len(due_soon_tasks), "sent": sent}
     except Exception:
         db.rollback()
         logger.exception("Error during scheduled reminder check")
+        raise
     finally:
         db.close()
 

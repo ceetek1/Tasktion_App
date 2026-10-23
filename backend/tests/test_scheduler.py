@@ -76,3 +76,25 @@ def test_job_is_scheduled_not_paused(monkeypatch):
     assert job is not None
     assert job.next_run_time is not None
     scheduler_module.scheduler.remove_job("send_reminders")
+
+
+def test_cron_endpoint_needs_secret(client, monkeypatch, member):
+    sent = _enable_email(monkeypatch)
+    _add_task(member["id"], hours=5)
+    monkeypatch.setattr(settings, "CRON_SECRET", "")
+    assert client.post("/cron/reminders", headers={"Authorization": "Bearer "}).status_code == 401
+
+    monkeypatch.setattr(settings, "CRON_SECRET", "s3cret")
+    assert client.post("/cron/reminders").status_code == 401
+    assert client.post("/cron/reminders", headers={"Authorization": "Bearer wrong"}).status_code == 401
+
+    r = client.post("/cron/reminders", headers={"Authorization": "Bearer s3cret"})
+    assert r.status_code == 200
+    assert r.json() == {"email_enabled": True, "due_soon": 1, "sent": 1}
+    assert sent == ["member@example.com"]
+
+
+def test_scheduler_off_on_vercel(monkeypatch):
+    from app.core.config import Settings
+    monkeypatch.setenv("VERCEL", "1")
+    assert Settings(SCHEDULER_ENABLED=True).SCHEDULER_ENABLED is False
