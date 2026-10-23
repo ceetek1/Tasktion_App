@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tasktion — Hatch your buddy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800&display=swap">
+    <link rel="stylesheet" href="../css/style.css?v=2">
+</head>
+<body>
+    <div class="garden">
+        <div class="garden-inner">
+            <header class="topline">
+                <span class="brand"><span id="brand-bug"></span><span class="brand-name">Tasktion</span></span>
+                <div class="progress-dots" id="dots" role="progressbar" aria-label="Onboarding progress" aria-valuemin="1" aria-valuemax="5" aria-valuenow="1">
+                    <span></span><span></span><span></span><span></span><span></span>
+                </div>
+                <a href="dashboard.html" id="skip-link" style="font-weight: 800; padding: 12px 8px;">Skip, I'm a pro</a>
+            </header>
+
+            <div class="split">
+                <div class="stage" id="stage">
+                    <div class="cloud floaty" style="top: 46px; left: 40px; width: 120px; height: 44px;" aria-hidden="true"></div>
+                    <div class="cloud floaty" style="top: 96px; right: 48px; width: 86px; height: 34px; animation-delay: -3s;" aria-hidden="true"></div>
+                    <div id="hill"></div>
+                    <div id="stage-confetti"></div>
+                    <div class="stage-center" id="stage-center"></div>
+                </div>
+
+                <div class="copy">
+                    <section data-step="0">
+                        <div class="copy">
+                            <p class="eyebrow">Step 1 of 5 · A mysterious egg</p>
+                            <h1 class="display">Psst… something's wiggling in here.</h1>
+                            <p class="lede">Every Tasktion player gets a tiny bug buddy. It munches the tasks you finish and cheers you on. Be nice to it.</p>
+                            <div class="actions">
+                                <button class="btn btn-primary" data-next>Crack it open!</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section data-step="1" hidden>
+                        <div class="copy">
+                            <p class="eyebrow">Step 2 of 5 · It hatched!</p>
+                            <h1 class="display">IT'S ALIVE! Your buddy needs a name.</h1>
+                            <div class="field">
+                                <label for="buddy-name" class="label-line">Buddy's name</label>
+                                <input id="buddy-name" class="input" maxlength="20" autocomplete="off" style="font-family: var(--font-display); font-size: 24px;">
+                                <p class="field-error" id="name-error" role="alert"></p>
+                            </div>
+                            <div class="field">
+                                <span class="label-line">Or steal one of ours:</span>
+                                <div class="chips" id="name-chips"></div>
+                            </div>
+                            <div class="actions">
+                                <button class="btn" data-back>Back</button>
+                                <button class="btn btn-primary" data-next>That's the one!</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section data-step="2" hidden>
+                        <div class="copy">
+                            <p class="eyebrow">Step 3 of 5 · Bug science</p>
+                            <h1 class="display">Wait… what kind of bug is <span data-name></span>?</h1>
+                            <div class="species-grid" id="species" role="group" aria-label="Bug type"></div>
+                            <div class="field">
+                                <span class="label-line">Pick an outfit · <span id="color-label"></span></span>
+                                <div class="swatches" id="swatches" role="group" aria-label="Colour"></div>
+                            </div>
+                            <div class="actions">
+                                <button class="btn" data-back>Back</button>
+                                <button class="btn btn-primary" data-next>Looking good!</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section data-step="3" hidden>
+                        <div class="copy">
+                            <p class="eyebrow">Step 4 of 5 · The rules (only three)</p>
+                            <h1 class="display">How to keep <span data-name></span> happy</h1>
+                            <ol class="rules">
+                                <li><span class="rule-num" style="background: var(--sky);">1</span><div><h3>Drop tasks in the jar</h3><p>Give it a name and a due date. That's it. No 47-field forms.</p></div></li>
+                                <li><span class="rule-num" style="background: var(--mint);">2</span><div><h3>Squash them for XP</h3><p>Finish a task, grab +20 XP, level up and unlock very silly badges.</p></div></li>
+                                <li><span class="rule-num" style="background: var(--cherry);">3</span><div><h3>Don't let them go overdue</h3><p>Late tasks make <span data-name></span> grumpy. Squash one a day to keep your streak lit.</p></div></li>
+                            </ol>
+                            <div class="actions">
+                                <button class="btn" data-back>Back</button>
+                                <button class="btn btn-primary" data-next>Got it, boss</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section data-step="4" hidden>
+                        <div class="copy">
+                            <p class="eyebrow">Step 5 of 5 · You're in!</p>
+                            <h1 class="display" id="ready-title">Level 1 unlocked: Tiny Bug Wrangler</h1>
+                            <p class="lede"><span data-name></span> is starving for tasks. Add one and squash it for a quick +20 XP.</p>
+                            <div class="xp-card">
+                                <div class="level-line" style="font-size: 16px;"><span>Your XP</span><span id="ready-xp">0 / 100 XP</span></div>
+                                <div class="meter"><span id="ready-meter" style="width: 0%;"></span></div>
+                                <div style="font-size: 15px; font-weight: 700;">Every squashed task is worth +20 XP.</div>
+                            </div>
+                            <div class="actions">
+                                <button class="btn" data-back>Back</button>
+                                <button class="btn btn-primary" id="finish-btn">Start squashing!</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+        <div id="ground"></div>
+    </div>
+
+    <script src="../js/config.js?v=2"></script>
+    <script src="../js/api.js?v=2"></script>
+    <script src="../js/critters.js?v=2"></script>
+    <script src="../js/onboarding.js?v=2"></script>
+</body>
+</html>

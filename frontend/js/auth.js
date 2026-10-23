@@ -54,10 +54,10 @@
             var errorEl = document.getElementById("register-error");
             try {
                 await register(email, password);
-                // Auto-login after registration
+                // Auto-login after registration, then hatch a buddy
                 var result = await login(email, password);
                 localStorage.setItem("token", result.access_token);
-                window.location.href = "dashboard.html";
+                window.location.href = "onboarding.html";
             } catch (err) {
                 errorEl.textContent = err.message;
             }
@@ -76,7 +76,7 @@
                     // Auto-login after registration
                     var loginResult = await login(email, password);
                     localStorage.setItem("token", loginResult.access_token);
-                    window.location.href = "dashboard.html";
+                    window.location.href = "onboarding.html";
                 } catch (err) {
                     errorEl.textContent = err.message;
                 }
@@ -91,23 +91,6 @@
         if (!token) {
             window.location.href = "login.html";
             return;
-        }
-
-        var userEmailEl = document.getElementById("user-email");
-        if (userEmailEl) {
-            userEmailEl.textContent = "Loading...";
-            fetchCurrentUser()
-                .then(function (user) {
-                    userEmailEl.textContent = user.email + " (" + user.role + ")";
-                })
-                .catch(function (err) {
-                    if (err.status === 401) {
-                        localStorage.removeItem("token");
-                        window.location.href = "login.html";
-                        return;
-                    }
-                    userEmailEl.textContent = "Logged in";
-                });
         }
 
         logoutBtn.addEventListener("click", function () {
