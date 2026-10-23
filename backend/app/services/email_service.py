@@ -14,7 +14,7 @@ def send_email(to_address: str, subject: str, body: str) -> bool:
 
     message = EmailMessage()
     message["Subject"] = subject
-    message["From"] = "noreply@taskflow.com"
+    message["From"] = settings.EMAIL_FROM
     message["To"] = to_address
     message.set_content(body)
 

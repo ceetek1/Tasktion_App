@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     logger.info("Application started")
     yield
     if scheduler.running:
-        scheduler.shutdown(wait=True)
+        scheduler.shutdown(wait=False)
         logger.info("Scheduler stopped")
     logger.info("Application shutdown")
 

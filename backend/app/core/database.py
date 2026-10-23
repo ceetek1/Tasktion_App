@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.engine import URL
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core.config import settings
@@ -28,7 +28,23 @@ def _database_url() -> str:
 
 DATABASE_URL = _database_url()
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
+def _connect_args(database_url: str) -> dict:
+    # Supabase only accepts SSL connections
+    url = make_url(database_url)
+    host = url.host or ""
+    if host.endswith((".supabase.co", ".supabase.com")) and "sslmode" not in url.query:
+        return {"sslmode": "require"}
+    return {}
+
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=5,
+    connect_args=_connect_args(DATABASE_URL),
+)
 
 
 class Base(DeclarativeBase):

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     MAILTRAP_PORT: int = 2525
     MAILTRAP_USER: str = ""
     MAILTRAP_PASSWORD: str = ""
+    EMAIL_FROM: str = "noreply@tasktion.app"
     ADMIN_SECRET: str = ""
     ALLOWED_ORIGINS: str = (
         "http://127.0.0.1:3000,http://localhost:3000,"
