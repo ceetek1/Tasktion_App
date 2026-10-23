@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.database import engine
 from app.api.auth import router as auth_router
 from app.api.invites import router as invites_router
+from app.api.cron import router as cron_router
 from app.api.tasks import router as tasks_router
 from app.api.users import router as users_router
 from app.services.scheduler import configure_scheduler, scheduler
@@ -56,6 +57,7 @@ app.add_middleware(
 app.include_router(tasks_router)
 app.include_router(auth_router)
 app.include_router(invites_router)
+app.include_router(cron_router)
 app.include_router(users_router)
 
 
@@ -92,6 +94,7 @@ def frontend_config():
     return Response(body, media_type="application/javascript", headers={"Cache-Control": "no-cache"})
 
 
-frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+# On Vercel the CDN serves public/ before requests reach the app; this mount covers local runs and other hosts
+frontend_dir = Path(__file__).resolve().parents[2] / "public"
 if frontend_dir.exists():
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")

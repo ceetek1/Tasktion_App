@@ -1,4 +1,7 @@
+import os
+
 from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -38,13 +41,17 @@ def _connect_args(database_url: str) -> dict:
     return {}
 
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=5,
-    connect_args=_connect_args(DATABASE_URL),
-)
+if os.environ.get("VERCEL"):
+    # Serverless instances come and go; let Supabase's pooler hold the connections
+    engine = create_engine(DATABASE_URL, poolclass=NullPool, connect_args=_connect_args(DATABASE_URL))
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=5,
+        connect_args=_connect_args(DATABASE_URL),
+    )
 
 
 class Base(DeclarativeBase):
