@@ -47,11 +47,11 @@ def send_reminders():
                 continue
             subject = f"Task reminder: {task.title} is due soon"
             body = (
-                f"Hi,\n\n"
+                f"Hi {recipient.display_name or 'there'},\n\n"
                 f"This is a reminder that your task '{task.title}' "
                 f"is due on {task.due_date.astimezone(timezone.utc).strftime('%Y-%m-%d at %H:%M UTC')}.\n\n"
                 f"Description: {task.description or 'No description'}\n\n"
-                f"Log in to Tasktion to manage your tasks."
+                f"Open Tasktion: {settings.app_url}/pages/dashboard.html"
             )
             if send_email(recipient.email, subject, body):
                 task.reminder_sent_at = datetime.now(timezone.utc)

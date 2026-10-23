@@ -1,0 +1,13 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "RAILPACK"
+  },
+  "deploy": {
+    "preDeployCommand": ["alembic -c backend/alembic.ini upgrade head"],
+    "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend --workers 1",
+    "healthcheckPath": "/health",
+    "numReplicas": 1,
+    "restartPolicyType": "ON_FAILURE"
+  }
+}

@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.user import UserRead
-from app.api.auth import require_admin
+from app.api.auth import get_current_user
 
 router = APIRouter()
 
@@ -13,18 +13,7 @@ def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    """Everyone in the group. Only invited friends have accounts, so any member may see the list."""
     return db.query(User).order_by(User.id.asc()).offset(skip).limit(limit).all()
-
-
-@router.get("/users/{user_id}", response_model=UserRead)
-def get_user(
-    user_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
-):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user

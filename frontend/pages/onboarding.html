@@ -3,11 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#235789">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Tasktion">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <title>Tasktion — Hatch your buddy</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800&display=swap">
-    <link rel="stylesheet" href="../css/style.css?v=2">
+    <link rel="stylesheet" href="../css/style.css?v=3">
 </head>
 <body>
     <div class="garden">
@@ -115,9 +123,11 @@
         <div id="ground"></div>
     </div>
 
-    <script src="../js/config.js?v=2"></script>
-    <script src="../js/api.js?v=2"></script>
-    <script src="../js/critters.js?v=2"></script>
-    <script src="../js/onboarding.js?v=2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+    <script src="../js/config.js?v=3"></script>
+    <script src="../js/session.js?v=3"></script>
+    <script src="../js/api.js?v=3"></script>
+    <script src="../js/critters.js?v=3"></script>
+    <script src="../js/onboarding.js?v=3"></script>
 </body>
 </html>

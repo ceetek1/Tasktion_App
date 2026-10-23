@@ -1,18 +1,19 @@
+import json
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
 from app.core.database import engine
-from app.api.admin import router as admin_router
 from app.api.auth import router as auth_router
+from app.api.invites import router as invites_router
 from app.api.tasks import router as tasks_router
 from app.api.users import router as users_router
 from app.services.scheduler import configure_scheduler, scheduler
@@ -54,7 +55,7 @@ app.add_middleware(
 
 app.include_router(tasks_router)
 app.include_router(auth_router)
-app.include_router(admin_router)
+app.include_router(invites_router)
 app.include_router(users_router)
 
 
@@ -78,6 +79,17 @@ def database_health_check():
 @app.get("/", include_in_schema=False)
 def root():
     return RedirectResponse(url="/pages/login.html")
+
+
+@app.get("/js/config.js", include_in_schema=False)
+def frontend_config():
+    """Browser settings from the environment, so each deploy needs no frontend edits."""
+    body = (
+        f"window.TASKTION_API_BASE = {json.dumps('')};\n"
+        f"window.TASKTION_SUPABASE_URL = {json.dumps(settings.SUPABASE_URL)};\n"
+        f"window.TASKTION_SUPABASE_KEY = {json.dumps(settings.SUPABASE_PUBLISHABLE_KEY)};\n"
+    )
+    return Response(body, media_type="application/javascript", headers={"Cache-Control": "no-cache"})
 
 
 frontend_dir = Path(__file__).resolve().parents[2] / "frontend"

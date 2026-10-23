@@ -24,7 +24,7 @@ async function apiRequest(method, path, body = null, extraHeaders = {}) {
     };
     if (body) options.body = JSON.stringify(body);
 
-    const token = localStorage.getItem("token");
+    const token = await Session.getToken();
     if (token) {
         options.headers["Authorization"] = `Bearer ${token}`;
     }
@@ -42,20 +42,21 @@ async function apiRequest(method, path, body = null, extraHeaders = {}) {
 }
 
 // Auth
-async function register(email, password) {
-    return apiRequest("POST", "/auth/register", { email, password });
-}
-
-async function login(email, password) {
-    return apiRequest("POST", "/auth/login", { email, password });
-}
-
-async function registerAdmin(email, password, adminSecret) {
-    return apiRequest("POST", "/auth/register-admin", { email, password }, { "x-admin-secret": adminSecret });
-}
-
 async function fetchCurrentUser() {
     return apiRequest("GET", "/auth/me");
+}
+
+// Invites
+async function createInvite() {
+    return apiRequest("POST", "/invites");
+}
+
+async function checkInvite(token) {
+    return apiRequest("GET", `/invites/${encodeURIComponent(token)}`);
+}
+
+async function acceptInvite(token) {
+    return apiRequest("POST", `/invites/${encodeURIComponent(token)}/accept`);
 }
 
 // Tasks
@@ -63,11 +64,12 @@ async function fetchTasks() {
     return apiRequest("GET", "/tasks");
 }
 
-async function createTask(title, description, dueDate) {
+async function createTask(title, description, dueDate, assignedTo) {
     return apiRequest("POST", "/tasks", {
         title,
         description,
         due_date: new Date(dueDate).toISOString(),
+        assigned_to: assignedTo,
     });
 }
 
@@ -79,15 +81,7 @@ async function deleteTask(taskId) {
     return apiRequest("DELETE", `/tasks/${taskId}`);
 }
 
-// Admin
-async function fetchAllTasks() {
-    return apiRequest("GET", "/admin/tasks");
-}
-
-async function assignTask(taskId, userId) {
-    return apiRequest("PATCH", `/admin/tasks/${taskId}/assign`, { assigned_to: userId });
-}
-
+// Group
 async function fetchUsers() {
     return apiRequest("GET", "/users");
 }

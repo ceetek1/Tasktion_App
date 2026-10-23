@@ -3,11 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#235789">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Tasktion">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <title>Tasktion — Bugs to squash</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800&display=swap">
-    <link rel="stylesheet" href="../css/style.css?v=2">
+    <link rel="stylesheet" href="../css/style.css?v=3">
 </head>
 <body>
     <header class="appbar">
@@ -54,9 +62,14 @@
         <main class="main">
             <div class="main-head">
                 <h1>Bugs to squash</h1>
+                <div class="main-actions">
+                <button class="btn" id="invite-btn" type="button">
+                    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><g class="i"><circle cx="9" cy="8" r="4"/><path d="M2 21c1-4 3.5-6 7-6s6 2 7 6M19 8v6M16 11h6"/></g></svg>Invite a friend
+                </button>
                 <button class="btn btn-primary" id="add-task-btn">
                     <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path class="i" stroke-width="3.4" d="M12 5v14M5 12h14"/></svg>Add a task
                 </button>
+                </div>
             </div>
 
             <div class="filters" role="tablist" aria-label="Filter tasks" id="filters"></div>
@@ -65,13 +78,6 @@
             <div class="loading" id="task-loading">Rounding up your bugs…</div>
             <ul class="task-list" id="task-list" aria-live="polite"></ul>
 
-            <section id="admin-section" class="hidden" aria-labelledby="admin-h">
-                <div class="section-title">
-                    <h2 id="admin-h">Everyone's bugs</h2>
-                    <p style="margin: 0; font-weight: 700;">Admin view: every task in the jar. Assign them to teammates.</p>
-                </div>
-                <ul class="task-list" id="admin-task-list" style="margin-top: 16px;"></ul>
-            </section>
         </main>
     </div>
 
@@ -117,7 +123,7 @@
                         <label for="task-time" class="label-line">Time <span aria-hidden="true">*</span></label>
                         <input id="task-time" type="time" class="input" aria-describedby="date-error">
                     </div>
-                    <div class="field hidden" id="assign-field">
+                    <div class="field" id="assign-field">
                         <label for="task-assignee" class="label-line">Who's on it?</label>
                         <select id="task-assignee" class="input"></select>
                     </div>
@@ -141,15 +147,35 @@
         <div class="detail" id="detail"></div>
     </dialog>
 
+    <!-- Invite a friend -->
+    <dialog class="sheet invite-sheet" id="invite-dialog" aria-labelledby="invite-h">
+        <div class="sheet-body">
+            <div class="sheet-head">
+                <h2 id="invite-h">Invite a friend</h2>
+                <button type="button" class="icon-btn" data-close aria-label="Close"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path class="i" stroke-width="3" d="M6 6l12 12M18 6L6 18"/></svg></button>
+            </div>
+            <p class="auth-note">Send this link to one friend. They sign in with Google, Microsoft or email and land straight in the group.</p>
+            <label for="invite-url" class="sr-only">Invite link</label>
+            <input id="invite-url" class="input" readonly>
+            <p class="auth-note muted" id="invite-line"></p>
+            <div class="sheet-foot">
+                <button type="button" class="btn" id="invite-copy">Copy link</button>
+                <button type="button" class="btn btn-primary" id="invite-share">Share…</button>
+            </div>
+        </div>
+    </dialog>
+
     <div class="toast hidden" id="toast" role="status" aria-live="polite">
         <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><path class="o" d="M24 4 L29 17 L43 18 L32 27 L36 41 L24 33 L12 41 L16 27 L5 18 L19 17 Z" fill="#FFD166"/></svg>
         <div><span class="toast-title" id="toast-title">SQUASH! +20 XP</span><span class="toast-line" id="toast-line"></span></div>
     </div>
 
-    <script src="../js/config.js?v=2"></script>
-    <script src="../js/api.js?v=2"></script>
-    <script src="../js/critters.js?v=2"></script>
-    <script src="../js/auth.js?v=2"></script>
-    <script src="../js/tasks.js?v=2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+    <script src="../js/config.js?v=3"></script>
+    <script src="../js/session.js?v=3"></script>
+    <script src="../js/api.js?v=3"></script>
+    <script src="../js/critters.js?v=3"></script>
+    <script src="../js/auth.js?v=3"></script>
+    <script src="../js/tasks.js?v=3"></script>
 </body>
 </html>

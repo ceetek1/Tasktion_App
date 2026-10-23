@@ -19,9 +19,9 @@ def send_email(to_address: str, subject: str, body: str) -> bool:
     message.set_content(body)
 
     try:
-        with smtplib.SMTP(settings.MAILTRAP_HOST, settings.MAILTRAP_PORT) as server:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
             server.starttls()
-            server.login(settings.MAILTRAP_USER, settings.MAILTRAP_PASSWORD)
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.send_message(message)
         logger.info("Email sent to %s with subject: %s", to_address, subject)
         return True
