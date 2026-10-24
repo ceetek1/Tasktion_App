@@ -6,7 +6,7 @@ A private task app for you and your friends: hand each other tasks, see who's do
 
 - ✅ **Task Management** — Create, update, and track tasks with deadlines
 - 🔔 **Email Reminders** — Automated notifications before tasks are due
-- 👥 **Friends group** — Sign in with Google, Microsoft or email; new people join only through a one-time invite link, and anyone in the group can give a task to anyone else
+- 👥 **Friends group** — Sign in with Google or email; new people join only through a one-time invite link, and anyone in the group can give a task to anyone else
 - 📱 **iPhone home-screen app** — Installable from Safari, no App Store needed
 - 📊 **Dashboard** — Overview of your tasks, deadlines, and progress
 - ⏰ **Scheduled Jobs** — Background scheduler that sends one reminder per task, about 24 hours before it is due
@@ -19,7 +19,7 @@ A private task app for you and your friends: hand each other tasks, see who's do
 - **SQLAlchemy** — ORM (Python ↔ database)
 - **Alembic** — Database migrations
 - **Pydantic** — Request/response validation
-- **Supabase Auth** — Google, Microsoft and email sign-in (the API only verifies its tokens)
+- **Supabase Auth** — Google and email sign-in (the API only verifies its tokens)
 - **python-jose** — JWT creation and verification
 - **APScheduler** — In-process reminder timer for always-on hosts (on Vercel, a GitHub Actions schedule calls `/cron/reminders` instead)
 - **smtplib** — Sending emails
@@ -118,7 +118,7 @@ All sign-in goes through Supabase Auth. The callback URL every provider needs is
 
 1. **Keys:** from Project Settings → API, put the project URL in `SUPABASE_URL` and the publishable (anon) key in `SUPABASE_PUBLISHABLE_KEY`. The browser gets both from `/js/config.js`.
 2. **Google:** in Google Cloud console, create an OAuth client ID (type *Web application*) with the callback URL above as an authorized redirect URI. Paste the client ID and secret into Supabase → Authentication → Sign In / Providers → Google.
-3. **Microsoft:** in the Microsoft Entra admin center, create an App registration with *Accounts in any organizational directory and personal Microsoft accounts*, add the callback URL as a Web redirect URI, and create a client secret. In Supabase, enable the **Azure** provider with that client ID and secret and the tenant URL `https://login.microsoftonline.com/common`.
+3. **Microsoft (optional, button hidden for now):** in the Microsoft Entra admin center, create an App registration with *Accounts in any organizational directory and personal Microsoft accounts*, add the callback URL as a Web redirect URI, and create a client secret. In Supabase, enable the **Azure** provider with that client ID and secret and the tenant URL `https://login.microsoftonline.com/common`. Then remove `hidden` from the `data-provider="azure"` button in `public/pages/login.html` to show it.
 4. **Email:** keep *Confirm email* on. Under Authentication → Emails → SMTP Settings, use the same SMTP account as reminders (Supabase's built-in mailer only sends a handful of emails an hour).
 5. **URL configuration:** set the Site URL to `APP_URL`, and add `<APP_URL>/pages/*` and `http://localhost:8000/pages/*` to the redirect URLs.
 6. Set `FIRST_MEMBER_EMAIL` to your own address. You join on your first sign-in; after that, use **Invite a friend** on the dashboard to make a single-use link (valid for `INVITE_EXPIRE_DAYS` days) for each friend. Anyone else who signs in sees "You need an invite".
