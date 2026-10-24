@@ -123,13 +123,15 @@ All sign-in goes through Supabase Auth. The callback URL every provider needs is
 5. **URL configuration:** set the Site URL to `APP_URL`, and add `<APP_URL>/pages/*` and `http://localhost:8000/pages/*` to the redirect URLs.
 6. Set `FIRST_MEMBER_EMAIL` to your own address. You join on your first sign-in; after that, use **Invite a friend** on the dashboard to make a single-use link (valid for `INVITE_EXPIRE_DAYS` days) for each friend. Anyone else who signs in sees "You need an invite".
 
-## Deployment (Vercel)
+## Deployment (Render)
 
-The app deploys to Vercel's free Hobby plan as one project. Vercel serves everything in `public/` from its CDN, and runs the FastAPI app (found through the root `index.py`) as a single function for the API and `/js/config.js`.
+The app deploys to Render's free plan as one web service, using `render.yaml`. The FastAPI server runs the API and serves the pages in `public/`.
+
+On the free plan the service **goes to sleep after 15 minutes without visitors**, and the next visit takes about a minute while it wakes up. Render's Starter plan removes the sleep if that gets annoying. Reminders still go out on time, because the hourly GitHub Actions call (step 4) wakes the service.
 
 ### 1. Database migrations (from your Mac)
 
-Vercel has no pre-deploy step, so run migrations yourself whenever a change adds one. Point `DATABASE_URL` at Supabase and run:
+Render's free plan has no pre-deploy step, so run migrations yourself whenever a change adds one. Point `DATABASE_URL` in `backend/.env` at Supabase and run:
 
 ```bash
 alembic -c backend/alembic.ini upgrade head
@@ -137,32 +139,40 @@ alembic -c backend/alembic.ini upgrade head
 
 > ⚠️ Migration `c4d2e8f1a9b3` deletes all users and tasks from the old password-based version.
 
-### 2. Create the Vercel project
+### 2. Create the Render service
 
-1. At [vercel.com/new](https://vercel.com/new), import this GitHub repository. Vercel detects FastAPI on its own; leave the build settings empty.
-2. Under **Settings → Environment Variables**, add the variables below for Production (and Preview, if you want previews to work).
-3. Deploy. Every push to `main` then goes live automatically, and every pull request gets its own preview link.
-4. Set `APP_URL` to the production address (for example `https://tasktion.vercel.app`) and redeploy. Add `<APP_URL>/pages/*` to Supabase's redirect URLs and set it as the Site URL.
+1. Sign in at [dashboard.render.com](https://dashboard.render.com) with GitHub.
+2. Click **New → Blueprint**, connect this repository, and pick the `main` branch. Render reads `render.yaml` and shows one free web service called `tasktion`.
+3. Render asks for the values marked `sync: false`. Copy them from `backend/.env`:
+   - `DATABASE_URL`: the same Session pooler URL as in `.env` (port `5432`). Render keeps one server running, so the session pooler suits it.
+   - `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `FIRST_MEMBER_EMAIL`, `CRON_SECRET`
+   - `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` (Brevo)
+   - `APP_URL`: enter `https://tasktion.onrender.com` for now; fix it in step 3 if Render picks a different address.
+4. Click **Deploy Blueprint**. The first build takes a few minutes. Every push to `main` then deploys automatically.
 
-Required on Vercel: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `FIRST_MEMBER_EMAIL`, `APP_URL`, `CRON_SECRET`, `ENVIRONMENT=production`, plus the SMTP variables for reminder emails.
+`render.yaml` already sets `ENVIRONMENT=production`, `SCHEDULER_ENABLED=false` and Brevo's SMTP host and port.
 
-For `DATABASE_URL` on Vercel, use Supabase's **Transaction pooler** string (port `6543`). Serverless instances open a short connection per request, which the transaction pooler is built for. `postgres://` and `postgresql://` URLs are both accepted.
+### 3. Point everything at the live address
 
-For SMTP, Brevo's free plan (`smtp-relay.brevo.com`, port 587, 300 emails a day) only needs a verified sender address, not a domain.
+1. Copy the service's address from the top of its Render page (for example `https://tasktion.onrender.com`). If it differs from what you entered, update `APP_URL` under the service's **Environment** tab and save; Render redeploys by itself.
+2. Check `https://<your-address>/health` shows `{"status":"ok"}`.
+3. **Supabase → Authentication → URL Configuration:** set the Site URL to the address and add `https://<your-address>/pages/*` to the redirect URLs (keep the localhost one for local runs).
+4. **Google Auth Platform → Clients → your client:** add the address to **Authorized JavaScript origins**. On the **Audience** page, make sure the app is *In production* so friends can sign in.
 
-### 3. Hourly reminders (GitHub Actions)
+### 4. Hourly reminders (GitHub Actions)
 
-Vercel stops the app between requests, so the in-process timer is switched off there automatically. Instead, `.github/workflows/reminders.yml` calls `POST /cron/reminders` every hour.
+`.github/workflows/reminders.yml` calls `POST /cron/reminders` every hour. The in-process timer is off on Render (`SCHEDULER_ENABLED=false`) because a sleeping service can't run it.
 
-1. Generate a secret: `python -c "import secrets; print(secrets.token_urlsafe(32))"`. Set it as `CRON_SECRET` on Vercel.
-2. In the GitHub repo, open **Settings → Secrets and variables → Actions**. Add the same value as the **secret** `CRON_SECRET`, and add a **variable** `APP_URL` with the production address.
-3. Run it once from the **Actions** tab (**Send reminders → Run workflow**). A green run that prints `{"email_enabled":true,...}` means it works.
+1. In the GitHub repo, open **Settings → Secrets and variables → Actions**. Add the **secret** `CRON_SECRET` with the same value as on Render, and the **variable** `APP_URL` with the live address.
+2. Run it once from the **Actions** tab (**Send reminders → Run workflow**). A green run that prints `{"email_enabled":true,...}` means it works. The first call after a quiet spell waits for the service to wake up; the workflow allows for that.
 
 GitHub may start scheduled runs a few minutes late, and pauses them after 60 days without any repository activity. If that happens, re-enable the workflow from the Actions tab.
 
-### Running elsewhere
+### Other hosts
 
-On a host that keeps one process running, start it with the `Procfile` command. The in-process scheduler then sends reminders itself; run a single worker, or set `SCHEDULER_ENABLED=false` on all but one process, to avoid duplicate emails.
+**Vercel (free Hobby plan):** import the repository at [vercel.com/new](https://vercel.com/new) and leave the build settings empty; Vercel finds the app through `index.py` and serves `public/` from its CDN. Add the same environment variables, but use Supabase's **Transaction pooler** URL (port `6543`) for `DATABASE_URL`. The in-process timer turns itself off on Vercel, and reminders come from the same GitHub Actions workflow.
+
+**Any host that keeps one process running:** start it with the `Procfile` command. The in-process scheduler then sends reminders itself, so you can skip the GitHub Actions workflow. Run a single worker, or set `SCHEDULER_ENABLED=false` on all but one process, to avoid duplicate emails.
 
 ## Installing on an iPhone
 
@@ -183,12 +193,13 @@ Tasktion_App/
 │   ├── alembic/                     # Database migration history
 │   ├── .env                         # Local secrets (never commit)
 │   └── .env.example                 # Environment template
-├── public/                          # Client-side app (served by Vercel's CDN)
+├── public/                          # Client-side app (pages, scripts, icons)
 │   ├── pages/                       # HTML pages (login, onboarding, dashboard)
 │   ├── css/                         # Stylesheets
 │   └── js/                          # Frontend scripts (session, api, auth, tasks)
 ├── requirements.txt                 # Python dependencies
 ├── Procfile                         # PaaS process commands
+├── render.yaml                      # Render Blueprint (free web service)
 ├── index.py                         # Vercel entrypoint (loads backend/app/main.py)
 ├── .github/workflows/reminders.yml  # Hourly reminder trigger
 ├── .gitignore
@@ -228,7 +239,7 @@ This folder contains all server-side components:
 | `SMTP_PASSWORD`       | Optional SMTP password                       |
 | `EMAIL_FROM`          | Sender address for reminder emails           |
 | `ALLOWED_ORIGINS`     | Comma-separated origins for separate frontend hosting |
-| `SCHEDULER_ENABLED`   | In-process reminder timer (always off on Vercel) |
+| `SCHEDULER_ENABLED`   | In-process reminder timer (off on Render via `render.yaml`, always off on Vercel) |
 | `CRON_SECRET`         | Bearer token for `POST /cron/reminders`      |
 
 ## License

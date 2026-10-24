@@ -1,0 +1,41 @@
+# Render Blueprint: Dashboard > New > Blueprint, then pick this repo.
+# The free plan sleeps after 15 minutes without traffic and takes about a minute to wake up.
+services:
+  - type: web
+    name: tasktion
+    runtime: python  # version from .python-version
+    plan: free
+    region: frankfurt  # closest Render region to the Supabase database (eu-west-1)
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      # The service sleeps when idle, so the hourly GitHub Actions call sends reminders instead
+      - key: SCHEDULER_ENABLED
+        value: "false"
+      - key: SMTP_HOST
+        value: smtp-relay.brevo.com
+      - key: SMTP_PORT
+        value: "587"
+      # Render asks for these when the Blueprint is created; copy them from backend/.env
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: FIRST_MEMBER_EMAIL
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
