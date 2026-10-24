@@ -1,5 +1,6 @@
-# Vercel stops the app between requests, so this schedule wakes it every hour to send due-soon reminders.
-# Needs repository settings: secret CRON_SECRET (same value as on Vercel) and variable APP_URL.
+# Render's free plan sleeps when idle and Vercel stops the app between requests, so this schedule
+# wakes the app every hour to send due-soon reminders. The 120s timeout covers Render's ~1 minute wake-up.
+# Needs repository settings: secret CRON_SECRET (same value as on Render or Vercel) and variable APP_URL.
 name: Send reminders
 
 on:
