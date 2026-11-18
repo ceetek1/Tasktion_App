@@ -1,9 +1,9 @@
 // Keeps a copy of the app shell on the phone so the home-screen app still opens without signal.
 // Pages and scripts come from the network first, so a deploy shows up on the next launch.
 // API and Supabase requests are never cached, so tasks are never stale.
-var CACHE = "tasktion-shell-v4";
-var SHELL = ["/pages/login.html", "/pages/dashboard.html", "/pages/onboarding.html"];
-var STATIC_PREFIXES = ["/pages/", "/css/", "/js/", "/icons/"];
+var CACHE = "tasktion-shell-v5";
+var SHELL = ["/app/", "/pages/login.html", "/pages/dashboard.html", "/pages/onboarding.html"];
+var STATIC_PREFIXES = ["/app/", "/pages/", "/css/", "/js/", "/icons/"];
 var PINNED_HOSTS = ["cdn.jsdelivr.net", "fonts.googleapis.com", "fonts.gstatic.com"];
 
 self.addEventListener("install", function (event) {
@@ -55,8 +55,10 @@ self.addEventListener("fetch", function (event) {
         // /js/config.js comes from the server's environment; always fetch it
         if (url.pathname === "/js/config.js") return;
         if (!STATIC_PREFIXES.some(function (p) { return url.pathname.indexOf(p) === 0; })) return;
-        // Sign-in redirects add ?code=…; cache the page itself, not each visit
-        var key = request.mode === "navigate" ? url.origin + url.pathname : request;
+        // Sign-in redirects add ?code=…; cache the page itself, not each visit.
+        // Every address inside the Voyage app (/app/day/…, /app/bosses) is the same page.
+        var page = url.pathname.indexOf("/app/") === 0 ? "/app/" : url.pathname;
+        var key = request.mode === "navigate" ? url.origin + page : request;
         event.respondWith(networkFirst(request, key));
     } else if (PINNED_HOSTS.indexOf(url.hostname) !== -1) {
         event.respondWith(cacheFirst(request));

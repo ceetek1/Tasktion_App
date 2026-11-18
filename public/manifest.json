@@ -1,13 +1,13 @@
 {
   "name": "Tasktion",
   "short_name": "Tasktion",
-  "description": "Squash tasks with your friends.",
+  "description": "Your term as a voyage: plan quests, face exam bosses, and focus.",
   "id": "/",
-  "start_url": "/pages/dashboard.html",
+  "start_url": "/app/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#FFF9EC",
-  "theme_color": "#235789",
+  "background_color": "#EFE6D2",
+  "theme_color": "#E6DCC5",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },

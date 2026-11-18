@@ -86,7 +86,8 @@ def database_health_check():
 
 @app.get("/", include_in_schema=False)
 def root():
-    return RedirectResponse(url="/pages/login.html")
+    # The Zen Voyage app; the classic pages stay at /pages/
+    return RedirectResponse(url="/app/")
 
 
 @app.get("/js/config.js", include_in_schema=False)
