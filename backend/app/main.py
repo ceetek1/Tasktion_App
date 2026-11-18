@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -102,5 +102,31 @@ def frontend_config():
 
 # The API server also serves the pages in public/
 frontend_dir = Path(__file__).resolve().parents[2] / "public"
+# The Zen Voyage app, built by `npm run build` in frontend/
+spa_dir = frontend_dir / "app"
+
+
+@app.get("/app", include_in_schema=False)
+def spa_root():
+    return RedirectResponse(url="/app/")
+
+
+@app.get("/app/{path:path}", include_in_schema=False)
+def spa(path: str):
+    """Files of the built app, and its index.html for every in-app address (e.g. /app/day/2026-11-20)."""
+    index = spa_dir / "index.html"
+    if not index.is_file():
+        raise HTTPException(status_code=404, detail="The app isn't built yet. Run `npm ci && npm run build` in frontend/.")
+    root = spa_dir.resolve()
+    target = (spa_dir / path).resolve()
+    if path and target.is_file() and root in target.parents:
+        # Built assets have content hashes in their names, so they never change
+        immutable = path.startswith("assets/")
+        return FileResponse(target, headers={"Cache-Control": "public, max-age=31536000, immutable" if immutable else "no-cache"})
+    if path.startswith("assets/"):
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(index, headers={"Cache-Control": "no-cache"})
+
+
 if frontend_dir.exists():
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
