@@ -24,17 +24,17 @@ TIMEOUT = httpx.Timeout(20.0, connect=10.0)
 Kind = Literal["task", "assignment", "exam", "reading", "revision", "study"]
 
 INSTRUCTIONS = """\
-Tasktion is the user's personal academic planner. Tasks are "quests": assignments, exams, readings,
+Tasktion is the user's personal academic planner. Its tasks are assignments, exams, readings,
 revision and study sessions, each with a due time, optional course, kind, estimate and planned day.
 All dates and times are in the user's own timezone (see get_settings).
 
 Rules:
-- Adding, completing, updating or moving a single quest: just do it, then say what changed.
-- plan_week only proposes. Show the user the proposed moves (day, quest, reason, over-capacity
+- Adding, completing, updating or moving a single task: just do it, then say what changed.
+- plan_week only proposes. Show the user the proposed moves (day, task, reason, over-capacity
   warnings) and ask. Call apply_plan only after the user clearly says yes, with exactly the moves they
   approved.
-- delete_quest: confirm the exact quest (title and due time) and get an explicit yes first. Prefer
-  complete_quest when the work is done.
+- delete_task: confirm the exact task (title and due time) and get an explicit yes first. Prefer
+  complete_task when the work is done.
 - Exams are events, not study blocks; suggest revision sessions for them instead.
 """
 
@@ -152,9 +152,9 @@ def check_time(value: str) -> str:
 # ---------- Reading the plan ----------
 @mcp.tool(annotations=READ_ONLY)
 async def today() -> dict:
-    """Today's plan in the user's timezone: quests planned for today, slipped ones (planned for an
+    """Today's plan in the user's timezone: tasks planned for today, slipped ones (planned for an
     earlier day and still open), overdue ones, deadlines in the next 48 hours, exams in the next 7 days,
-    and today's load in minutes against the daily capacity (quests without an estimate count 45 min)."""
+    and today's load in minutes against the daily capacity (tasks without an estimate count 45 min)."""
     return await api("GET", "/planner/today")
 
 
@@ -162,8 +162,8 @@ async def today() -> dict:
 async def week(
     start: Annotated[str | None, Field(description="First day, YYYY-MM-DD. Defaults to today.")] = None,
 ) -> dict:
-    """Seven days of the plan: each day's planned quests, what falls due that day, and the day's load
-    against capacity. Also the "harbour": open quests not planned for any day yet."""
+    """Seven days of the plan: each day's planned tasks, what falls due that day, and the day's load
+    against capacity. Also the unplanned tasks: open tasks not planned for any day yet."""
     params = {"start": check_date(start)} if start else None
     return await api("GET", "/planner/week", params=params)
 
@@ -178,9 +178,9 @@ async def what_now(
     return await api("GET", "/planner/next", params={"limit": limit})
 
 
-# ---------- Changing single quests (no confirmation needed) ----------
+# ---------- Changing single tasks (no confirmation needed) ----------
 @mcp.tool(annotations=WRITES)
-async def add_quest(
+async def add_task(
     title: Annotated[str, Field(min_length=1, max_length=200)],
     due: Annotated[
         str,
@@ -195,7 +195,7 @@ async def add_quest(
     estimate_minutes: Annotated[int | None, Field(gt=0, le=1440, description="How long it should take.")] = None,
     description: str | None = None,
 ) -> dict:
-    """Add a quest (task) to the planner. Use kind 'exam' for exams, 'revision' for revising for one
+    """Add a task to the planner. Use kind 'exam' for exams, 'revision' for revising for one
     (give it the same course so it gets prioritised before the exam), 'reading', 'assignment' or 'study'
     for the rest. Do it straight away; no confirmation needed."""
     zone = await _zone()
@@ -212,16 +212,16 @@ async def add_quest(
 
 
 @mcp.tool(annotations=IDEMPOTENT_WRITE)
-async def complete_quest(task_id: int) -> dict:
-    """Mark a quest as done. Do it straight away when the user says they finished something."""
+async def complete_task(task_id: int) -> dict:
+    """Mark a task as done. Do it straight away when the user says they finished something."""
     return await api("PATCH", f"/tasks/{task_id}", json={"status": "completed"})
 
 
 @mcp.tool(annotations=IDEMPOTENT_WRITE)
-async def update_quest(
+async def update_task(
     task_id: int,
     title: Annotated[str | None, Field(min_length=1, max_length=200)] = None,
-    due: Annotated[str | None, Field(description="New due time, ISO, user's local time (see add_quest).")] = None,
+    due: Annotated[str | None, Field(description="New due time, ISO, user's local time (see add_task).")] = None,
     planned_for: Annotated[
         str | None, Field(description="Reschedule: the day to work on it, YYYY-MM-DD.")
     ] = None,
@@ -232,9 +232,9 @@ async def update_quest(
     estimate_minutes: Annotated[int | None, Field(gt=0, le=1440)] = None,
     description: str | None = None,
 ) -> dict:
-    """Change one quest: rename it, move its deadline, reschedule it to another day (planned_for), take it
+    """Change one task: rename it, move its deadline, reschedule it to another day (planned_for), take it
     off the plan (unplan), start it (status in_progress), or change course, kind, estimate or notes. Only
-    the fields given change. A single move like this needs no confirmation; to move many quests at once,
+    the fields given change. A single move like this needs no confirmation; to move many tasks at once,
     use plan_week and apply_plan."""
     body: dict[str, Any] = {}
     if due is not None:
@@ -261,13 +261,13 @@ async def update_quest(
 
 
 @mcp.tool(annotations=DESTRUCTIVE)
-async def delete_quest(task_id: int) -> str:
-    """Delete a quest for good; this can't be undone. BEFORE calling this, tell the user exactly which
-    quest (title and due time) will be deleted and get their explicit yes in this conversation. If the
-    work was simply finished, use complete_quest instead."""
+async def delete_task(task_id: int) -> str:
+    """Delete a task for good; this can't be undone. BEFORE calling this, tell the user exactly which
+    task (title and due time) will be deleted and get their explicit yes in this conversation. If the
+    work was simply finished, use complete_task instead."""
     task = await api("GET", f"/tasks/{task_id}")
     await api("DELETE", f"/tasks/{task_id}")
-    return f"Deleted quest {task_id}: {task['title']}"
+    return f"Deleted task {task_id}: {task['title']}"
 
 
 # ---------- Planning the week ----------
@@ -275,9 +275,9 @@ async def delete_quest(task_id: int) -> str:
 async def plan_week(
     start: Annotated[str | None, Field(description="First day of the plan, YYYY-MM-DD. Defaults to today.")] = None,
 ) -> dict:
-    """Propose a plan for the next 7 days. Changes nothing. Unplanned and slipped open quests due within
+    """Propose a plan for the next 7 days. Changes nothing. Unplanned and slipped open tasks due within
     14 days go on the earliest day before their deadline that fits under the daily capacity, otherwise on
-    the lightest day flagged over_capacity. Show the user every proposed move (quest, day, reason) and
+    the lightest day flagged over_capacity. Show the user every proposed move (task, day, reason) and
     the day loads, mention over-capacity days, and ask whether to apply it. Only call apply_plan after
     an explicit yes. In the evening, consider starting from tomorrow."""
     return await api("POST", "/planner/plan-week", json={"start": check_date(start)} if start else {})
@@ -290,7 +290,7 @@ class PlanMove(BaseModel):
 
 @mcp.tool(annotations=DESTRUCTIVE)
 async def apply_plan(moves: Annotated[list[PlanMove], Field(min_length=1, max_length=100)]) -> dict:
-    """Write a week plan: set the planned day of each quest, all or nothing. ONLY call this after showing
+    """Write a week plan: set the planned day of each task, all or nothing. ONLY call this after showing
     the user the proposal from plan_week and getting their explicit yes in this conversation. Send exactly
     the moves they approved (drop or change any they asked to)."""
     body = {"moves": [{"task_id": m.task_id, "planned_for": check_date(m.planned_for)} for m in moves]}
@@ -347,7 +347,7 @@ def evening_review() -> str:
     """End the day: what got done, what rolls over, and tomorrow's start."""
     return (
         "Let's do my evening review in Tasktion. Call today and week. Tell me what I finished today, what's "
-        "still open from today's plan, and what I should start with tomorrow. Ask me which open quests I "
+        "still open from today's plan, and what I should start with tomorrow. Ask me which open tasks I "
         "actually finished and mark those complete. Then offer to replan from tomorrow with plan_week, show "
         "me the proposal, and apply it only if I say yes."
     )
@@ -358,7 +358,7 @@ def weekly_plan() -> str:
     """Plan the next seven days around deadlines and exams."""
     return (
         "Help me plan my week in Tasktion. Call week and get_settings first. Ask me about anything missing: "
-        "new assignments, exams or readings (add them with add_quest, with course, kind and an estimate), "
+        "new assignments, exams or readings (add them with add_task, with course, kind and an estimate), "
         "and whether my daily capacity is right. Then call plan_week, show me the proposed moves day by day "
         "with the reasons and any over-capacity days, and wait for my yes before calling apply_plan."
     )

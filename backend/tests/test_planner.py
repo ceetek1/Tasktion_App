@@ -151,12 +151,12 @@ def test_today_endpoint(client, member):
 
 
 # ---------- week ----------
-def test_week_days_and_harbour(member):
+def test_week_days_and_unplanned(member):
     uid = member["id"]
     thursday = TODAY + timedelta(days=1)
     on_thursday = _task(uid, "Thursday work", NOW + timedelta(days=4), planned_for=thursday, estimate_minutes=90)
     done_thursday = _task(uid, "Done Thursday", NOW + timedelta(days=4), planned_for=thursday, status="completed")
-    harbour = _task(uid, "Unplanned", NOW + timedelta(days=2))
+    unplanned = _task(uid, "Unplanned", NOW + timedelta(days=2))
     _task(uid, "Next week", NOW + timedelta(days=12), planned_for=TODAY + timedelta(days=9))
 
     week = _with_user(uid, planner.week_plan, now=NOW)
@@ -167,8 +167,8 @@ def test_week_days_and_harbour(member):
     assert _ids(day.tasks) == [on_thursday, done_thursday]
     assert day.load_minutes == 90
     assert sum(len(d.tasks) for d in week.days) == 2
-    assert _ids(week.harbour) == [harbour]
-    assert harbour in _ids(week.days[2].due)
+    assert _ids(week.unplanned) == [unplanned]
+    assert unplanned in _ids(week.days[2].due)
 
 
 def test_week_endpoint_accepts_start(client, member):

@@ -58,7 +58,7 @@ class PlannerSettingsUpdate(BaseModel):
 
 
 class Load(BaseModel):
-    load_minutes: int
+    load_minutes: int = Field(description="Estimated minutes of open, non-exam tasks; 45 per task without an estimate")
     capacity_minutes: int
     over_capacity: bool
 
@@ -84,13 +84,13 @@ class WeekPlan(BaseModel):
     start: date
     timezone: str
     days: list[DayPlan]
-    harbour: list[TaskRead]
+    unplanned: list[TaskRead] = Field(description="Open tasks with no planned day")
 
 
 class Suggestion(BaseModel):
     task: TaskRead
-    score: int
-    reasons: list[str]
+    score: int = Field(description="Higher means sooner; only meaningful for ordering")
+    reasons: list[str] = Field(description="Readable reasons, most important first")
 
 
 class NextUp(BaseModel):
@@ -109,7 +109,7 @@ class Move(BaseModel):
 class ProposedMove(Move):
     title: str
     previously_planned_for: date | None
-    due_date: str
+    due_date: str = Field(description="UTC, ISO 8601")
     estimate_minutes: int
     reason: str
     over_capacity: bool

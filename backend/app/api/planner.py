@@ -24,6 +24,9 @@ router = APIRouter(prefix="/planner", tags=["planner"])
 
 @router.get("/today", response_model=TodayPlan)
 def today(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Today in the member's timezone: tasks planned for today, slipped tasks (planned for an earlier
+    day, still open), overdue tasks, tasks due in the next 48 hours, exams in the next 7 days, and
+    today's load against the daily capacity. Covers tasks the member made or was given."""
     return planner.today_plan(db, current_user)
 
 
@@ -33,6 +36,8 @@ def week(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Seven days from `start`: each day's planned tasks (any status), open tasks due that day and the
+    day's load; plus the open tasks with no planned day (`unplanned`)."""
     return planner.week_plan(db, current_user, start)
 
 
@@ -42,6 +47,8 @@ def next_up(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Open tasks ranked by what to do next, each with a score and readable reasons. Exams are events,
+    so they are never suggested; revision for an exam in the next 7 days is boosted."""
     return NextUp(suggestions=planner.next_up(db, current_user, limit))
 
 
@@ -51,7 +58,10 @@ def plan_week(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """A proposal only: nothing changes until it is sent to /planner/apply-plan."""
+    """Propose planned days for the next 7 days. Writes nothing: send the moves you accept to
+    /planner/apply-plan. Unplanned and slipped open tasks (not exams) due within 14 days go on the
+    earliest day up to their due day that fits under the daily capacity, else on the lightest such day
+    with `over_capacity` set."""
     try:
         return planner.propose_week(db, current_user, body.start if body else None)
     except planner.PlannerError as exc:
@@ -64,6 +74,8 @@ def apply_plan(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Set `planned_for` on each listed task, all or nothing. 404 if any task isn't the member's,
+    422 for a day that has already passed."""
     try:
         updated = planner.apply_moves(db, current_user, [(m.task_id, m.planned_for) for m in body.moves])
     except planner.PlannerError as exc:
@@ -75,6 +87,7 @@ def apply_plan(
 
 @router.get("/settings", response_model=PlannerSettings)
 def get_settings(current_user: User = Depends(get_current_user)):
+    """Timezone, daily capacity (minutes) and briefing settings; times are local HH:MM."""
     return current_user
 
 
@@ -84,6 +97,7 @@ def update_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Change only the fields sent. The timezone must be an IANA name."""
     changes = body.model_dump(exclude_unset=True)
     for key, value in changes.items():
         setattr(current_user, key, value)

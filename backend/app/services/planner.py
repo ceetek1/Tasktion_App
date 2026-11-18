@@ -189,7 +189,7 @@ def week_plan(db: Session, user: User, start: date | None = None, now: datetime 
         start=start,
         timezone=clock.tz.key,
         days=day_plans,
-        harbour=_read([t for t in open_ if t.planned_for is None]),
+        unplanned=_read([t for t in open_ if t.planned_for is None]),
     )
 
 
