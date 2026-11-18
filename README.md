@@ -28,7 +28,8 @@ A private task app for you and your friends: hand each other tasks, see who's do
 
 ### Frontend
 
-- HTML, CSS, Vanilla JavaScript
+- **The Voyage** (`frontend/`, served at `/app/`): Vite, React, TypeScript, React Router, TanStack Query, dnd-kit, Motion and react-zoom-pan-pinch, in the Zen Voyage design
+- **Classic pages** (`public/pages/`): HTML, CSS and vanilla JavaScript; still served at `/pages/`
 
 ### Database
 
@@ -40,6 +41,7 @@ A private task app for you and your friends: hand each other tasks, see who's do
 ### Prerequisites
 
 - Python 3.10+
+- Node.js 22 or newer, for the frontend
 - PostgreSQL (for local development)
 - pip or poetry for dependency management
 
@@ -72,27 +74,35 @@ A private task app for you and your friends: hand each other tasks, see who's do
    # Edit .env with your database URL, email credentials, and JWT secret
    ```
 
-5. **Run database migrations**
+5. **Build the frontend**
+
+   ```bash
+   cd frontend && npm ci && npm run build && cd ..
+   ```
+
+   This writes the app to `public/app/` (not committed), which FastAPI serves at `/app/`. While working on the frontend, run `npm run dev` in `frontend/` instead: Vite serves the app at http://localhost:5173/app/ and forwards API calls to the backend on port 8000. `npm test` runs its Vitest tests.
+
+6. **Run database migrations**
 
    ```bash
    alembic -c backend/alembic.ini upgrade head
    ```
 
-6. **Start the application**
+7. **Start the application**
 
    ```bash
    uvicorn app.main:app --reload --app-dir backend
    ```
 
-7. **Access the app**
-   - App: http://localhost:8000
+8. **Access the app**
+   - App: http://localhost:8000 (opens the Voyage at `/app/`; the classic pages are at `/pages/dashboard.html`)
    - API Docs: http://localhost:8000/docs
    - Health check: http://localhost:8000/health
    - Database check: http://localhost:8000/health/db
 
    If sign-up returns 404, check that nothing else is already listening on port 8000 (`lsof -iTCP:8000 -sTCP:LISTEN`).
 
-8. **Run the tests**
+9. **Run the tests**
 
    Tests use a separate database. Create it once, then run pytest from the repository root:
 
@@ -132,7 +142,8 @@ The app runs on Railway as one always-on web service. The FastAPI server runs th
 
 1. At [railway.com/new](https://railway.com/new), choose **Deploy from GitHub repo** and pick this repository. Railway builds it with Railpack, using the Python version in `.python-version`.
 2. Under the service's **Settings → Source**, check the branch is `main`. Every push to `main` then deploys automatically.
-3. Under the service's **Settings → Deploy**, set:
+3. Under the service's **Settings → Build**, set the **Custom Build Command** to `cd frontend && npm ci --include=dev && npm run build`, and under **Variables** add `RAILPACK_PACKAGES=node@24` so the Python build also has Node. The build then writes the app to `public/app/`.
+4. Under the service's **Settings → Deploy**, set:
    - **Pre-deploy command:** `alembic -c backend/alembic.ini upgrade head`, so migrations apply themselves. A failed migration stops the deploy and the old version keeps running.
    - **Start command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend --workers 1`
    - **Healthcheck path:** `/health` (timeout 120 seconds)
@@ -158,7 +169,7 @@ The start command runs a single uvicorn worker on one replica, so each reminder 
 
 1. Under **Settings → Networking**, click **Generate Domain** (for example `https://tasktion-production.up.railway.app`). Set `APP_URL` to it.
 2. Check `https://<your-address>/health` shows `{"status":"ok"}`.
-3. **Supabase → Authentication → URL Configuration:** set the Site URL to the address and add `https://<your-address>/pages/*` to the redirect URLs (keep the localhost one for local runs).
+3. **Supabase → Authentication → URL Configuration:** set the Site URL to the address and add both `https://<your-address>/pages/*` and `https://<your-address>/app/*` to the redirect URLs (keep the localhost ones for local runs). The Voyage signs in at `/app/`.
 4. **Google Auth Platform → Clients → your client:** add the address to **Authorized JavaScript origins**. On the **Audience** page, make sure the app is *In production* so friends can sign in.
 
 ### Other hosts
@@ -248,6 +259,8 @@ Tasks gained `course`, `kind` (`task`, `assignment`, `exam`, `reading`, `revisio
 
 Open the deployed `APP_URL` in **Safari**, tap **Share → Add to Home Screen**, then open Tasktion from the home screen and sign in once. The home-screen app keeps its own sign-in, separate from Safari.
 
+A home-screen icon added before the Voyage opens the classic dashboard, which still works. To get the Voyage on the home screen, remove the old icon and add Tasktion again from Safari.
+
 ## Project Structure
 
 ```
@@ -263,7 +276,11 @@ Tasktion_App/
 │   ├── alembic/                     # Database migration history
 │   ├── .env                         # Local secrets (never commit)
 │   └── .env.example                 # Environment template
-├── public/                          # Client-side app (pages, scripts, icons)
+├── frontend/                        # The Voyage: Vite + React + TypeScript (builds into public/app)
+│   ├── src/screens/                 # Voyage map, day island, bosses, focus, chart room, treasure, settings
+│   ├── src/art/                     # Hand-drawn SVG from the Zen Voyage boards
+│   └── src/lib/                     # API client, queries, and the voyage rules (with Vitest tests)
+├── public/                          # Classic pages, icons, manifest and service worker (+ built app/)
 │   ├── pages/                       # HTML pages (login, onboarding, dashboard)
 │   ├── css/                         # Stylesheets
 │   └── js/                          # Frontend scripts (session, api, auth, tasks)
