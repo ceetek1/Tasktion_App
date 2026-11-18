@@ -1,3 +1,5 @@
+from enum import Enum
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -8,6 +10,9 @@ from app.models.user import User
 from app.api.auth import get_current_user
 
 router = APIRouter()
+
+# An assignee decides when they do the work and whether it's done; the rest is the creator's
+ASSIGNEE_FIELDS = {"status", "planned_for"}
 
 
 def _get_visible_task(db: Session, task_id: int, user: User) -> Task:
@@ -66,6 +71,10 @@ def create_task(
         due_date=task.due_date,
         user_id=current_user.id,
         assigned_to=task.assigned_to,
+        course=task.course,
+        kind=task.kind.value,
+        planned_for=task.planned_for,
+        estimate_minutes=task.estimate_minutes,
     )
     db.add(new_task)
     db.commit()
@@ -82,9 +91,9 @@ def update_task(
 ):
     existing_task = _get_visible_task(db, task_id, current_user)
 
-    task_data = task_update.model_dump(exclude_unset=True)
-    if existing_task.user_id != current_user.id and set(task_data) - {"status"}:
-        raise HTTPException(status_code=403, detail="Assignees can only update task status")
+    task_data = task_update.model_dump(exclude_unset=True, mode="python")
+    if existing_task.user_id != current_user.id and set(task_data) - ASSIGNEE_FIELDS:
+        raise HTTPException(status_code=403, detail="Assignees can only update task status and planned day")
 
     if "assigned_to" in task_data:
         _check_assignee(db, task_data["assigned_to"])
@@ -94,7 +103,7 @@ def update_task(
     if "due_date" in task_data:
         existing_task.reminder_sent_at = None
     for key, value in task_data.items():
-        setattr(existing_task, key, value)
+        setattr(existing_task, key, value.value if isinstance(value, Enum) else value)
     db.commit()
     db.refresh(existing_task)
     return existing_task

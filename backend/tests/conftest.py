@@ -37,7 +37,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 from app.core.database import Base, SessionLocal, engine  # noqa: E402
-from app.models import invite as _invite_model, task as _task_model  # noqa: E402,F401
+from app.models import access_token as _token_model, invite as _invite_model, task as _task_model  # noqa: E402,F401
 from app.models.user import User  # noqa: E402
 from app.main import app  # noqa: E402
 
@@ -54,7 +54,7 @@ def _schema():
 def _clean_tables():
     yield
     with engine.begin() as conn:
-        conn.execute(text("TRUNCATE invites, tasks, users RESTART IDENTITY CASCADE"))
+        conn.execute(text("TRUNCATE access_tokens, invites, tasks, users RESTART IDENTITY CASCADE"))
 
 
 @pytest.fixture

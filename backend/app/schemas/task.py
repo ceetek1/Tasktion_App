@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 
 
@@ -7,6 +7,15 @@ class TaskStatus(str, Enum):
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
+
+
+class TaskKind(str, Enum):
+    TASK = "task"
+    ASSIGNMENT = "assignment"
+    EXAM = "exam"
+    READING = "reading"
+    REVISION = "revision"
+    STUDY = "study"
 
 
 def _ensure_utc(v: datetime) -> datetime:
@@ -23,16 +32,36 @@ def _future_utc(v: datetime) -> datetime:
     return v
 
 
+def _utc_iso(v: datetime | None) -> str | None:
+    return None if v is None else _ensure_utc(v).isoformat().replace("+00:00", "Z")
+
+
+def _clean_course(v: str | None) -> str | None:
+    if v is None:
+        return None
+    v = v.strip()
+    return v or None
+
+
 class TaskCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: str | None = None
     due_date: datetime
     assigned_to: int | None = None
+    course: str | None = Field(None, max_length=80)
+    kind: TaskKind = TaskKind.TASK
+    planned_for: date | None = None
+    estimate_minutes: int | None = Field(None, gt=0, le=1440)
 
     @field_validator("due_date")
     @classmethod
     def due_date_must_be_future(cls, v):
         return _future_utc(v)
+
+    @field_validator("course")
+    @classmethod
+    def strip_course(cls, v):
+        return _clean_course(v)
 
 
 class TaskRead(BaseModel):
@@ -43,11 +72,20 @@ class TaskRead(BaseModel):
     status: TaskStatus = TaskStatus.PENDING
     user_id: int
     assigned_to: int | None = None
+    course: str | None = None
+    kind: TaskKind = TaskKind.TASK
+    planned_for: date | None = None
+    estimate_minutes: int | None = None
+    completed_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
     @field_serializer("due_date")
     def serialize_due_date(self, v: datetime) -> str:
-        return _ensure_utc(v).isoformat().replace("+00:00", "Z")
+        return _utc_iso(v)
+
+    @field_serializer("completed_at")
+    def serialize_completed_at(self, v: datetime | None) -> str | None:
+        return _utc_iso(v)
 
 
 class TaskUpdate(BaseModel):
@@ -56,15 +94,25 @@ class TaskUpdate(BaseModel):
     due_date: datetime | None = None
     status: TaskStatus | None = None
     assigned_to: int | None = None
+    course: str | None = Field(None, max_length=80)
+    kind: TaskKind | None = None
+    # null takes the task off the plan
+    planned_for: date | None = None
+    estimate_minutes: int | None = Field(None, gt=0, le=1440)
 
     @field_validator("due_date")
     @classmethod
     def due_date_must_be_future(cls, v):
         return None if v is None else _future_utc(v)
 
+    @field_validator("course")
+    @classmethod
+    def strip_course(cls, v):
+        return _clean_course(v)
+
     @model_validator(mode="after")
     def reject_null_required_fields(self):
-        for field in ("title", "due_date", "status"):
+        for field in ("title", "due_date", "status", "kind"):
             if field in self.model_fields_set and getattr(self, field) is None:
                 raise ValueError(f"{field} cannot be null")
         return self

@@ -12,6 +12,7 @@ from app.core.database import Base, DATABASE_URL
 from app.models.user import User
 from app.models.task import Task
 from app.models.invite import Invite
+from app.models.access_token import AccessToken
 
 
 # this is the Alembic Config object, which provides
