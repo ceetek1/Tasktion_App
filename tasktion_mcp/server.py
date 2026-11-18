@@ -189,15 +189,20 @@ async def add_task(
             "for the end of that day. Must be in the future."
         ),
     ],
-    course: Annotated[str | None, Field(max_length=80, description="Course or module, e.g. 'Biology 101'.")] = None,
+    course: Annotated[
+        str | None, Field(max_length=80, description="Course name, e.g. 'Biology 101'. A new name creates the course.")
+    ] = None,
     kind: Kind = "task",
     planned_for: Annotated[str | None, Field(description="Day to work on it, YYYY-MM-DD.")] = None,
     estimate_minutes: Annotated[int | None, Field(gt=0, le=1440, description="How long it should take.")] = None,
     description: str | None = None,
+    exam_task_id: Annotated[
+        int | None, Field(description="For revision: the id of the exam task it prepares for (see exam_status).")
+    ] = None,
 ) -> dict:
-    """Add a task to the planner. Use kind 'exam' for exams, 'revision' for revising for one
-    (give it the same course so it gets prioritised before the exam), 'reading', 'assignment' or 'study'
-    for the rest. Do it straight away; no confirmation needed."""
+    """Add a task to the planner. Use kind 'exam' for exams, 'revision' for revising for one, and
+    'reading', 'assignment' or 'study' for the rest. Link a revision task to its exam with exam_task_id so it counts towards that exam and
+    is prioritised in the week before it. Do it straight away; no confirmation needed."""
     zone = await _zone()
     body = {
         "title": title,
@@ -207,6 +212,7 @@ async def add_task(
         "description": description,
         "estimate_minutes": estimate_minutes,
         "planned_for": check_date(planned_for) if planned_for else None,
+        "boss_task_id": exam_task_id,
     }
     return await api("POST", "/tasks", json=body)
 
@@ -295,6 +301,37 @@ async def apply_plan(moves: Annotated[list[PlanMove], Field(min_length=1, max_le
     the moves they approved (drop or change any they asked to)."""
     body = {"moves": [{"task_id": m.task_id, "planned_for": check_date(m.planned_for)} for m in moves]}
     return await api("POST", "/planner/apply-plan", json=body)
+
+
+# ---------- Courses, exams and focus ----------
+@mcp.tool(annotations=READ_ONLY)
+async def list_courses() -> dict:
+    """The user's courses with their weekly classes (weekday 0 = Monday, times are local HH:MM). Use the
+    course names when adding tasks."""
+    return {"courses": await api("GET", "/courses")}
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def exam_status() -> dict:
+    """Every exam with its revision progress: the revision tasks linked to it and how many are done.
+    `health` counts down from 5 as linked revision tasks are completed; 0 means the revision target is
+    met. Use this to tell the user how ready they are for each exam and what revision is left."""
+    return {"exams": await api("GET", "/bosses")}
+
+
+@mcp.tool(annotations=WRITES)
+async def log_focus(
+    minutes: Annotated[int, Field(gt=0, le=600, description="Minutes of focused study that just ended.")],
+    task_id: Annotated[int | None, Field(description="The task the session was for, if any.")] = None,
+    complete_task: Annotated[bool, Field(description="Also mark that task done.")] = False,
+) -> dict:
+    """Record a focus (study) session the user just finished, optionally for a task, and optionally mark
+    that task done. No confirmation needed."""
+    if complete_task and task_id is None:
+        raise ToolError("Give task_id to mark a task done.")
+    return await api(
+        "POST", "/focus-sessions/log", json={"minutes": minutes, "task_id": task_id, "complete_task": complete_task}
+    )
 
 
 # ---------- Settings ----------

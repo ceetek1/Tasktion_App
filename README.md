@@ -226,7 +226,7 @@ Times are in your own timezone, which the dashboard saves from your browser when
 - *"Delete the old quiz."* Claude names the exact task and waits for your yes.
 - The prompts **morning_briefing**, **evening_review** and **weekly_plan** in Claude Desktop's prompt menu run these routines for you.
 
-Tools: `today`, `week`, `what_now`, `add_task`, `complete_task`, `update_task`, `delete_task`, `plan_week`, `apply_plan`, `get_settings`, `update_settings`.
+Tools: `today`, `week`, `what_now`, `add_task`, `complete_task`, `update_task`, `delete_task`, `plan_week`, `apply_plan`, `list_courses`, `exam_status`, `log_focus`, `get_settings`, `update_settings`.
 
 ### Planner API
 
