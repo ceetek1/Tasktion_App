@@ -15,6 +15,7 @@ from app.core.database import engine
 from app.api.auth import router as auth_router
 from app.api.invites import router as invites_router
 from app.api.cron import router as cron_router
+from app.api.planner import router as planner_router
 from app.api.tasks import router as tasks_router
 from app.api.tokens import router as tokens_router
 from app.api.users import router as users_router
@@ -61,6 +62,7 @@ app.include_router(invites_router)
 app.include_router(cron_router)
 app.include_router(users_router)
 app.include_router(tokens_router)
+app.include_router(planner_router)
 
 
 @app.get("/health", tags=["health"])
