@@ -2,6 +2,9 @@ import { useState, type FormEvent } from "react";
 import { MonkBust } from "../art/Art";
 import { appUrl, supabase } from "../lib/supabase";
 
+// Hidden until the Microsoft (Azure) provider is set up in Supabase, as on the classic sign-in page
+const SHOW_MICROSOFT = false;
+
 export function NotInvited({ onSignOut }: { onSignOut: () => void }) {
   return (
     <div className="signin">
@@ -54,7 +57,7 @@ export default function SignIn() {
         </div>
         <p className="small" style={{ margin: 0 }}>Every term is a voyage. Sign in to see this week's islands.</p>
         <button type="button" className="btn" onClick={() => provider("google")}>Continue with Google</button>
-        <button type="button" className="btn" onClick={() => provider("azure")}>Continue with Microsoft</button>
+        {SHOW_MICROSOFT && <button type="button" className="btn" onClick={() => provider("azure")}>Continue with Microsoft</button>}
         <form className="stack" onSubmit={submit} aria-label={mode === "in" ? "Sign in with email" : "Create an account"}>
           {mode === "up" && (
             <div className="field"><label className="label" htmlFor="si-name">Your name</label><input id="si-name" className="input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></div>

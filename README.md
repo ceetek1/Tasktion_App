@@ -129,7 +129,7 @@ All sign-in goes through Supabase Auth. The callback URL every provider needs is
 
 1. **Keys:** from Project Settings → API, put the project URL in `SUPABASE_URL` and the publishable (anon) key in `SUPABASE_PUBLISHABLE_KEY`. The browser gets both from `/js/config.js`.
 2. **Google:** in Google Cloud console, create an OAuth client ID (type *Web application*) with the callback URL above as an authorized redirect URI. Paste the client ID and secret into Supabase → Authentication → Sign In / Providers → Google.
-3. **Microsoft (optional, button hidden for now):** in the Microsoft Entra admin center, create an App registration with *Accounts in any organizational directory and personal Microsoft accounts*, add the callback URL as a Web redirect URI, and create a client secret. In Supabase, enable the **Azure** provider with that client ID and secret and the tenant URL `https://login.microsoftonline.com/common`. Then remove `hidden` from the `data-provider="azure"` button in `public/pages/login.html` to show it.
+3. **Microsoft (optional, button hidden for now):** in the Microsoft Entra admin center, create an App registration with *Accounts in any organizational directory and personal Microsoft accounts*, add the callback URL as a Web redirect URI, and create a client secret. In Supabase, enable the **Azure** provider with that client ID and secret and the tenant URL `https://login.microsoftonline.com/common`. Then remove `hidden` from the `data-provider="azure"` button in `public/pages/login.html`, and set `SHOW_MICROSOFT` to `true` in `frontend/src/screens/SignIn.tsx`, to show it.
 4. **Email:** keep *Confirm email* on. Under Authentication → Emails → SMTP Settings, use the same SMTP account as reminders (Supabase's built-in mailer only sends a handful of emails an hour).
 5. **URL configuration:** set the Site URL to `APP_URL`, and add `<APP_URL>/pages/*` and `http://localhost:8000/pages/*` to the redirect URLs.
 6. Set `FIRST_MEMBER_EMAIL` to your own address. You join on your first sign-in; after that, use **Invite a friend** on the dashboard to make a single-use link (valid for `INVITE_EXPIRE_DAYS` days) for each friend. Anyone else who signs in sees "You need an invite".
@@ -142,7 +142,11 @@ The app runs on Railway as one always-on web service. The FastAPI server runs th
 
 1. At [railway.com/new](https://railway.com/new), choose **Deploy from GitHub repo** and pick this repository. Railway builds it with Railpack, using the Python version in `.python-version`.
 2. Under the service's **Settings → Source**, check the branch is `main`. Every push to `main` then deploys automatically.
-3. Under the service's **Settings → Build**, set the **Custom Build Command** to `cd frontend && npm ci --include=dev && npm run build`, and under **Variables** add `RAILPACK_PACKAGES=node@24` so the Python build also has Node. The build then writes the app to `public/app/`.
+3. Under the service's **Variables**, add these two so the Python build also builds the Voyage frontend into `public/app/`:
+   - `RAILPACK_PACKAGES=node@24`
+   - `RAILPACK_BUILD_CMD=cd frontend && npm ci --include=dev && npm run build`
+
+   Setting the same command as the **Custom Build Command** under **Settings → Build** works for new deploys too, but a **Redeploy** reuses the earlier deployment's settings and skips it; variables are read fresh every time. Check the build log lists a `build` step running that command.
 4. Under the service's **Settings → Deploy**, set:
    - **Pre-deploy command:** `alembic -c backend/alembic.ini upgrade head`, so migrations apply themselves. A failed migration stops the deploy and the old version keeps running.
    - **Start command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend --workers 1`
