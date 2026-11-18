@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 from pydantic import model_validator
@@ -33,21 +32,13 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8000,http://localhost:8000"
     )
     SCHEDULER_ENABLED: bool = True
-    # Bearer token the scheduled GitHub Actions workflow sends to /cron/reminders
+    # Bearer token for POST /cron/reminders, to trigger reminders by hand; empty turns the endpoint off
     CRON_SECRET: str = ""
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent.parent / ".env",
         extra="ignore",
     )
-
-    @model_validator(mode="after")
-    def no_scheduler_on_vercel(self):
-        # Vercel stops the process between requests, so the in-process timer would never fire;
-        # reminders come from /cron/reminders instead
-        if os.environ.get("VERCEL"):
-            self.SCHEDULER_ENABLED = False
-        return self
 
     @model_validator(mode="after")
     def validate_auth(self):

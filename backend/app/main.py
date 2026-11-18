@@ -94,7 +94,7 @@ def frontend_config():
     return Response(body, media_type="application/javascript", headers={"Cache-Control": "no-cache"})
 
 
-# On Vercel the CDN serves public/ before requests reach the app; this mount covers local runs and other hosts
+# The API server also serves the pages in public/
 frontend_dir = Path(__file__).resolve().parents[2] / "public"
 if frontend_dir.exists():
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")

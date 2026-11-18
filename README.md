@@ -21,7 +21,7 @@ A private task app for you and your friends: hand each other tasks, see who's do
 - **Pydantic** — Request/response validation
 - **Supabase Auth** — Google and email sign-in (the API only verifies its tokens)
 - **python-jose** — JWT creation and verification
-- **APScheduler** — In-process reminder timer for always-on hosts (on Vercel, a GitHub Actions schedule calls `/cron/reminders` instead)
+- **APScheduler** — In-process reminder timer
 - **smtplib** — Sending emails
 - **psycopg2-binary** — PostgreSQL driver
 
@@ -123,56 +123,46 @@ All sign-in goes through Supabase Auth. The callback URL every provider needs is
 5. **URL configuration:** set the Site URL to `APP_URL`, and add `<APP_URL>/pages/*` and `http://localhost:8000/pages/*` to the redirect URLs.
 6. Set `FIRST_MEMBER_EMAIL` to your own address. You join on your first sign-in; after that, use **Invite a friend** on the dashboard to make a single-use link (valid for `INVITE_EXPIRE_DAYS` days) for each friend. Anyone else who signs in sees "You need an invite".
 
-## Deployment (Render)
+## Deployment (Railway)
 
-The app deploys to Render's free plan as one web service, using `render.yaml`. The FastAPI server runs the API and serves the pages in `public/`.
+The app runs on Railway as one always-on web service. The FastAPI server runs the API, serves the pages in `public/`, and sends reminders from its in-process scheduler. The database and sign-in stay on Supabase. Use the Hobby plan so the service never pauses.
 
-On the free plan the service **goes to sleep after 15 minutes without visitors**, and the next visit takes about a minute while it wakes up. Render's Starter plan removes the sleep if that gets annoying. Reminders still go out on time, because the hourly GitHub Actions call (step 4) wakes the service.
+### 1. Create the Railway service
 
-### 1. Database migrations (from your Mac)
-
-Render's free plan has no pre-deploy step, so run migrations yourself whenever a change adds one. Point `DATABASE_URL` in `backend/.env` at Supabase and run:
-
-```bash
-alembic -c backend/alembic.ini upgrade head
-```
+1. At [railway.com/new](https://railway.com/new), choose **Deploy from GitHub repo** and pick this repository. Railway builds it with Railpack, using the Python version in `.python-version`.
+2. Under the service's **Settings → Source**, check the branch is `main`. Every push to `main` then deploys automatically.
+3. Under the service's **Settings → Deploy**, set:
+   - **Pre-deploy command:** `alembic -c backend/alembic.ini upgrade head`, so migrations apply themselves. A failed migration stops the deploy and the old version keeps running.
+   - **Start command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend --workers 1`
+   - **Healthcheck path:** `/health` (timeout 120 seconds)
+   - **Regions:** one replica in EU West (Amsterdam), close to the Supabase database.
 
 > ⚠️ Migration `c4d2e8f1a9b3` deletes all users and tasks from the old password-based version.
 
-### 2. Create the Render service
+### 2. Environment variables
 
-1. Sign in at [dashboard.render.com](https://dashboard.render.com) with GitHub.
-2. Click **New → Blueprint**, connect this repository, and pick the `main` branch. Render reads `render.yaml` and shows one free web service called `tasktion`.
-3. Render asks for the values marked `sync: false`. Copy them from `backend/.env`:
-   - `DATABASE_URL`: the same Session pooler URL as in `.env` (port `5432`). Render keeps one server running, so the session pooler suits it.
-   - `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `FIRST_MEMBER_EMAIL`, `CRON_SECRET`
-   - `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` (Brevo)
-   - `APP_URL`: enter `https://tasktion.onrender.com` for now; fix it in step 3 if Render picks a different address.
-4. Click **Deploy Blueprint**. The first build takes a few minutes. Every push to `main` then deploys automatically.
+Under the service's **Variables** tab, add these (copy the secrets from `backend/.env`):
 
-`render.yaml` already sets `ENVIRONMENT=production`, `SCHEDULER_ENABLED=false` and Brevo's SMTP host and port.
+- `ENVIRONMENT=production`
+- `DATABASE_URL`: Supabase's **Session pooler** URL (port `5432`), the same as in `.env`.
+- `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `FIRST_MEMBER_EMAIL`
+- `SMTP_HOST=smtp-relay.brevo.com`, `SMTP_PORT=587`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM`
+- `SCHEDULER_ENABLED=true`
+- `CRON_SECRET` (optional): lets you trigger reminders by hand with `POST /cron/reminders`.
+- `APP_URL`: the public address from step 3.
+
+The start command runs a single uvicorn worker on one replica, so each reminder is sent once. Keep it that way, or set `SCHEDULER_ENABLED=false` on all but one process.
 
 ### 3. Point everything at the live address
 
-1. Copy the service's address from the top of its Render page (for example `https://tasktion.onrender.com`). If it differs from what you entered, update `APP_URL` under the service's **Environment** tab and save; Render redeploys by itself.
+1. Under **Settings → Networking**, click **Generate Domain** (for example `https://tasktion-production.up.railway.app`). Set `APP_URL` to it.
 2. Check `https://<your-address>/health` shows `{"status":"ok"}`.
 3. **Supabase → Authentication → URL Configuration:** set the Site URL to the address and add `https://<your-address>/pages/*` to the redirect URLs (keep the localhost one for local runs).
 4. **Google Auth Platform → Clients → your client:** add the address to **Authorized JavaScript origins**. On the **Audience** page, make sure the app is *In production* so friends can sign in.
 
-### 4. Hourly reminders (GitHub Actions)
-
-`.github/workflows/reminders.yml` calls `POST /cron/reminders` every hour. The in-process timer is off on Render (`SCHEDULER_ENABLED=false`) because a sleeping service can't run it.
-
-1. In the GitHub repo, open **Settings → Secrets and variables → Actions**. Add the **secret** `CRON_SECRET` with the same value as on Render, and the **variable** `APP_URL` with the live address.
-2. Run it once from the **Actions** tab (**Send reminders → Run workflow**). A green run that prints `{"email_enabled":true,...}` means it works. The first call after a quiet spell waits for the service to wake up; the workflow allows for that.
-
-GitHub may start scheduled runs a few minutes late, and pauses them after 60 days without any repository activity. If that happens, re-enable the workflow from the Actions tab.
-
 ### Other hosts
 
-**Vercel (free Hobby plan):** import the repository at [vercel.com/new](https://vercel.com/new) and leave the build settings empty; Vercel finds the app through `index.py` and serves `public/` from its CDN. Add the same environment variables, but use Supabase's **Transaction pooler** URL (port `6543`) for `DATABASE_URL`. The in-process timer turns itself off on Vercel, and reminders come from the same GitHub Actions workflow.
-
-**Any host that keeps one process running:** start it with the `Procfile` command. The in-process scheduler then sends reminders itself, so you can skip the GitHub Actions workflow. Run a single worker, or set `SCHEDULER_ENABLED=false` on all but one process, to avoid duplicate emails.
+Any host that keeps one process running works: run the migrations, then start the `Procfile` web command.
 
 ## Installing on an iPhone
 
@@ -199,9 +189,6 @@ Tasktion_App/
 │   └── js/                          # Frontend scripts (session, api, auth, tasks)
 ├── requirements.txt                 # Python dependencies
 ├── Procfile                         # PaaS process commands
-├── render.yaml                      # Render Blueprint (free web service)
-├── index.py                         # Vercel entrypoint (loads backend/app/main.py)
-├── .github/workflows/reminders.yml  # Hourly reminder trigger
 ├── .gitignore
 └── README.md
 ```
@@ -239,8 +226,8 @@ This folder contains all server-side components:
 | `SMTP_PASSWORD`       | Optional SMTP password                       |
 | `EMAIL_FROM`          | Sender address for reminder emails           |
 | `ALLOWED_ORIGINS`     | Comma-separated origins for separate frontend hosting |
-| `SCHEDULER_ENABLED`   | In-process reminder timer (off on Render via `render.yaml`, always off on Vercel) |
-| `CRON_SECRET`         | Bearer token for `POST /cron/reminders`      |
+| `SCHEDULER_ENABLED`   | In-process reminder timer (default: on)      |
+| `CRON_SECRET`         | Optional bearer token to trigger reminders with `POST /cron/reminders` |
 
 ## License
 
