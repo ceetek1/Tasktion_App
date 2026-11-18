@@ -16,6 +16,7 @@ from app.schemas.planner import (
     TodayPlan,
     WeekPlan,
 )
+from app.schemas.study import History
 from app.schemas.task import TaskRead
 from app.services import planner
 
@@ -83,6 +84,20 @@ def apply_plan(
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     return ApplyPlanResult(updated=[TaskRead.model_validate(t) for t in updated])
+
+
+@router.get("/history", response_model=History)
+def history(
+    start: date | None = Query(None, description="First day. Defaults to the term start, else 28 days ago."),
+    end: date | None = Query(None, description="Last day. Defaults to today."),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Per day: tasks planned and done, any tasks completed, and minutes of focus."""
+    try:
+        return planner.history(db, current_user, start, end)
+    except planner.PlannerError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.get("/settings", response_model=PlannerSettings)

@@ -2,6 +2,7 @@ from datetime import date, datetime, time, timedelta, timezone
 
 from app.core.config import settings
 from app.core.database import SessionLocal
+from app.models.course import ClassSession, Course
 from app.models.task import Task
 from app.models.user import User
 from app.services import scheduler as scheduler_module
@@ -52,6 +53,23 @@ def _task(owner_id, title, due, **fields):
     db.close()
 
 
+def _course(owner_id, name):
+    db = SessionLocal()
+    course = Course(user_id=owner_id, name=name, glyph=name[0], colour="#5F8A8B")
+    db.add(course)
+    db.commit()
+    course_id = course.id
+    db.close()
+    return course_id
+
+
+def _class(course_id, weekday, start, end, place=None):
+    db = SessionLocal()
+    db.add(ClassSession(course_id=course_id, weekday=weekday, starts_at=start, ends_at=end, place=place))
+    db.commit()
+    db.close()
+
+
 # ---------- timing ----------
 def test_due_slot_window():
     at = time(7, 30)
@@ -88,9 +106,11 @@ def test_briefings_off_by_default(monkeypatch, member):
 def test_morning_briefing_sent_once_per_day(monkeypatch, member):
     sent = _enable_email(monkeypatch)
     _set_user(member["id"], briefings_enabled=True, timezone="Europe/London")
-    _task(member["id"], "Lab report", _at(17, 0), planned_for=DAY, estimate_minutes=90, course="Chemistry")
+    chemistry = _course(member["id"], "Chemistry")
+    _class(chemistry, DAY.weekday(), time(9, 0), time(10, 30), "Lab 3")
+    _task(member["id"], "Lab report", _at(17, 0), planned_for=DAY, estimate_minutes=90, course_id=chemistry)
     _task(member["id"], "Old reading", _at(12, 0) + timedelta(days=3), planned_for=DAY - timedelta(days=2))
-    _task(member["id"], "Physics exam", _at(9, 0) + timedelta(days=2), kind="exam", course="Physics")
+    _task(member["id"], "Physics exam", _at(9, 0) + timedelta(days=2), kind="exam", course_id=_course(member["id"], "Physics"))
 
     scheduler_module.send_briefings(now=_at(7, 15))
     assert sent == []
@@ -103,6 +123,7 @@ def test_morning_briefing_sent_once_per_day(monkeypatch, member):
     to, subject, body = sent[0]
     assert to == "member@example.com"
     assert subject == "Today: 1 task planned (1 h 30 min)"
+    assert "CLASSES TODAY\n  - 09:00-10:30 Chemistry (Lab 3)" in body
     assert "TODAY'S PLAN\n  - Lab report [Chemistry] · ~1 h 30 min · due today 17:00" in body
     assert "SLIPPED FROM EARLIER DAYS\n  - Old reading" in body
     assert "DEADLINES (OVERDUE OR WITHIN 48 HOURS)\n  - Lab report" in body

@@ -1,9 +1,10 @@
 from app.core.database import Base
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, String
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from datetime import date, datetime, timezone
 
 TASK_KINDS = ("task", "assignment", "exam", "reading", "revision", "study")
+GUARDIANS = ("kraken", "dragon", "golem")
 
 
 class Task(Base):
@@ -12,6 +13,7 @@ class Task(Base):
         CheckConstraint("status IN ('pending', 'in_progress', 'completed')", name="ck_task_status"),
         CheckConstraint(f"kind IN {TASK_KINDS!r}", name="ck_task_kind"),
         CheckConstraint("estimate_minutes > 0", name="ck_task_estimate_positive"),
+        CheckConstraint(f"guardian IN {GUARDIANS!r}", name="ck_task_guardian"),
         Index("ix_tasks_user_id_planned_for", "user_id", "planned_for"),
     )
 
@@ -23,15 +25,29 @@ class Task(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     assigned_to: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    course: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    course_id: Mapped[int | None] = mapped_column(
+        ForeignKey("courses.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     kind: Mapped[str] = mapped_column(default="task", server_default="task")
     # The day the member means to work on it, in their own timezone
     planned_for: Mapped[date | None] = mapped_column(Date, nullable=True)
     estimate_minutes: Mapped[int | None] = mapped_column(nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # An exam's guardian; the exam is a "boss" that revision tasks wear down
+    guardian: Mapped[str | None] = mapped_column(nullable=True)
+    # For revision: the exam task it prepares for
+    boss_task_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     owner = relationship("User", foreign_keys=[user_id], back_populates="created_tasks")
     assignee = relationship("User", foreign_keys=[assigned_to], back_populates="assigned_tasks")
+    course_ref = relationship("Course", lazy="joined")
+
+    @property
+    def course(self) -> str | None:
+        """The course name, for readers that only want text (emails, Claude Desktop)."""
+        return self.course_ref.name if self.course_ref is not None else None
 
     @validates("status")
     def _track_completion(self, _key, status):
@@ -42,3 +58,6 @@ class Task(Base):
         else:
             self.completed_at = None
         return status
+
+# Registers Course for the course_ref relationship above
+from app.models import course as _course_model  # noqa: E402,F401

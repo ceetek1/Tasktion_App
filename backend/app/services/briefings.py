@@ -67,6 +67,10 @@ def morning_briefing(db: Session, user: User, clock: Clock) -> tuple[str, str]:
         + (" That's more than your daily capacity, so think about moving something." if load.over_capacity else "")
     )
     lines.append("")
+    lines += _section(
+        "CLASSES TODAY",
+        [f"  - {c.starts_at:%H:%M}-{c.ends_at:%H:%M} {c.course}{f' ({c.place})' if c.place else ''}" for c in today.classes],
+    )
     lines += ["TODAY'S PLAN"] + (
         [_line(t, clock) for t in today.planned]
         or ["  Nothing planned yet. Ask Claude to plan your day, or pick from the list below."]
@@ -94,8 +98,9 @@ def evening_briefing(db: Session, user: User, clock: Clock, day: date) -> tuple[
     open_tasks = planner.open_tasks(db, user)
     rolling = [TaskRead.model_validate(t) for t in open_tasks if t.planned_for == day]
     tomorrow = day + timedelta(days=1)
-    planned_tomorrow = planner.rank([t for t in open_tasks if t.planned_for == tomorrow], clock)
-    ranked = planned_tomorrow or planner.rank(open_tasks, clock)
+    exams = planner.upcoming_exams(open_tasks, clock)
+    planned_tomorrow = planner.rank([t for t in open_tasks if t.planned_for == tomorrow], clock, exams)
+    ranked = planned_tomorrow or planner.rank(open_tasks, clock, exams)
 
     lines = [f"Good evening {_name(user)},", ""]
     lines += ["DONE TODAY"] + ([_line(t, clock, show_due=False) for t in done] or ["  Nothing ticked off today."]) + [""]

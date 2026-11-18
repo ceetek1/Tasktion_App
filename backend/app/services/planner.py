@@ -10,8 +10,11 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.models.course import ClassSession, Course
+from app.models.focus_session import FocusSession
 from app.models.task import Task
 from app.models.user import User
+from app.schemas.study import DayClass, DayRecord, History
 from app.schemas.planner import (
     DayLoad,
     DayPlan,
@@ -96,6 +99,42 @@ def done_on(db: Session, user: User, day: date, clock: Clock) -> list[Task]:
     )
 
 
+def classes_by_weekday(db: Session, user: User) -> dict[int, list[DayClass]]:
+    sessions = (
+        db.query(ClassSession, Course)
+        .join(Course, ClassSession.course_id == Course.id)
+        .filter(Course.user_id == user.id)
+        .order_by(ClassSession.starts_at, ClassSession.id)
+        .all()
+    )
+    out: dict[int, list[DayClass]] = {}
+    for session, course in sessions:
+        out.setdefault(session.weekday, []).append(
+            DayClass(
+                id=session.id,
+                course_id=course.id,
+                weekday=session.weekday,
+                starts_at=session.starts_at,
+                ends_at=session.ends_at,
+                place=session.place,
+                course=course.name,
+                colour=course.colour,
+            )
+        )
+    return out
+
+
+def in_term(user: User, day: date) -> bool:
+    """Classes run only during the term, when one is set."""
+    if user.term_start is None or user.term_weeks is None:
+        return True
+    return user.term_start <= day < user.term_start + timedelta(weeks=user.term_weeks)
+
+
+def classes_on(day: date, user: User, by_weekday: dict[int, list[DayClass]]) -> list[DayClass]:
+    return by_weekday.get(day.weekday(), []) if in_term(user, day) else []
+
+
 # ---------- Small helpers ----------
 def estimate(task: Task) -> int:
     return task.estimate_minutes or DEFAULT_ESTIMATE_MINUTES
@@ -158,6 +197,7 @@ def today_plan(db: Session, user: User, now: datetime | None = None) -> TodayPla
         overdue=_read([t for t in tasks if t.due_date < clock.now]),
         due_soon=_read([t for t in tasks if clock.now <= t.due_date <= clock.now + DUE_SOON]),
         exams=_read([t for t in tasks if is_exam(t) and clock.now <= t.due_date < exam_end]),
+        classes=classes_on(today, user, classes_by_weekday(db, user)),
         load=Load(**_load(load_minutes(planned), user.daily_capacity_minutes)),
     )
 
@@ -174,6 +214,7 @@ def week_plan(db: Session, user: User, start: date | None = None, now: datetime 
         .all()
     )
     open_ = [t for t in tasks if t.status != "completed"]
+    by_weekday = classes_by_weekday(db, user)
     day_plans = []
     for day in days:
         planned = [t for t in tasks if t.planned_for == day]
@@ -182,6 +223,7 @@ def week_plan(db: Session, user: User, start: date | None = None, now: datetime 
                 date=day,
                 tasks=_read(planned),
                 due=_read([t for t in open_ if clock.day_of(t.due_date) == day]),
+                classes=classes_on(day, user, by_weekday),
                 **_load(load_minutes(planned), user.daily_capacity_minutes),
             )
         )
@@ -194,16 +236,13 @@ def week_plan(db: Session, user: User, start: date | None = None, now: datetime 
 
 
 # ---------- What now? ----------
-def _upcoming_exams_by_course(tasks: list[Task], clock: Clock) -> dict[str, Task]:
+def upcoming_exams(tasks: list[Task], clock: Clock) -> dict[int, Task]:
+    """Open exams in the next 7 days, by id."""
     horizon = clock.start_of(clock.today + timedelta(days=EXAM_LOOKAHEAD_DAYS + 1))
-    exams: dict[str, Task] = {}
-    for t in tasks:
-        if is_exam(t) and t.course and clock.now <= t.due_date < horizon:
-            exams.setdefault(t.course.casefold(), t)
-    return exams
+    return {t.id: t for t in tasks if is_exam(t) and t.status != "completed" and clock.now <= t.due_date < horizon}
 
 
-def _score(task: Task, clock: Clock, exams: dict[str, Task]) -> tuple[int, list[str]]:
+def _score(task: Task, clock: Clock, exams: dict[int, Task]) -> tuple[int, list[str]]:
     score, reasons = 0, []
     until_due = task.due_date - clock.now
     if until_due < timedelta(0):
@@ -230,18 +269,18 @@ def _score(task: Task, clock: Clock, exams: dict[str, Task]) -> tuple[int, list[
         score += SCORE_IN_PROGRESS
         reasons.append("already in progress")
 
-    exam = exams.get(task.course.casefold()) if task.kind == "revision" and task.course else None
+    exam = exams.get(task.boss_task_id) if task.boss_task_id is not None else None
     if exam is not None:
         score += SCORE_REVISION_FOR_EXAM
-        reasons.append(f"revision for the {exam.course} exam {when_label(exam.due_date, clock)}")
+        reasons.append(f"revision for the exam \"{exam.title}\" {when_label(exam.due_date, clock)}")
 
     if not reasons:
         reasons.append(f"next deadline: {when_label(task.due_date, clock)}")
     return score, reasons
 
 
-def rank(tasks: list[Task], clock: Clock) -> list[tuple[Task, int, list[str]]]:
-    exams = _upcoming_exams_by_course(tasks, clock)
+def rank(tasks: list[Task], clock: Clock, exams: dict[int, Task] | None = None) -> list[tuple[Task, int, list[str]]]:
+    exams = upcoming_exams(tasks, clock) if exams is None else exams
     scored = [(t, *_score(t, clock, exams)) for t in tasks if t.status != "completed" and not is_exam(t)]
     scored.sort(key=lambda item: (-item[1], item[0].due_date, item[0].id))
     return scored
@@ -337,3 +376,52 @@ def apply_moves(db: Session, user: User, moves: list[tuple[int, date]], now: dat
     for t in updated:
         db.refresh(t)
     return updated
+
+
+# ---------- History ----------
+HISTORY_MAX_DAYS = 400
+
+
+def history(db: Session, user: User, start: date | None = None, end: date | None = None,
+            now: datetime | None = None) -> History:
+    """Per day: tasks planned and done, tasks completed, and minutes of focus. Defaults to the term so far."""
+    clock = clock_for(user, now)
+    end = end or clock.today
+    start = start or user.term_start or end - timedelta(days=27)
+    if start > end:
+        raise PlannerError("start must be on or before end")
+    if (end - start).days >= HISTORY_MAX_DAYS:
+        raise PlannerError(f"Ask for at most {HISTORY_MAX_DAYS} days")
+    lo, hi = clock.start_of(start), clock.start_of(end + timedelta(days=1))
+
+    planned = (
+        _visible(db, user)
+        .filter(Task.planned_for.between(start, end), Task.kind != "exam")
+        .all()
+    )
+    completed = _visible(db, user).filter(Task.completed_at >= lo, Task.completed_at < hi).all()
+    sessions = (
+        db.query(FocusSession)
+        .filter(
+            FocusSession.user_id == user.id,
+            FocusSession.completed_at.is_not(None),
+            FocusSession.started_at >= lo,
+            FocusSession.started_at < hi,
+        )
+        .all()
+    )
+    days = []
+    day = start
+    while day <= end:
+        on_day = [t for t in planned if t.planned_for == day]
+        days.append(
+            DayRecord(
+                date=day,
+                planned=len(on_day),
+                done=sum(1 for t in on_day if t.status == "completed"),
+                completed=sum(1 for t in completed if clock.day_of(t.completed_at) == day),
+                focus_minutes=sum(f.minutes for f in sessions if clock.day_of(f.started_at) == day),
+            )
+        )
+        day += timedelta(days=1)
+    return History(start=start, end=end, timezone=clock.tz.key, days=days)

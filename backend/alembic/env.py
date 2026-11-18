@@ -13,6 +13,9 @@ from app.models.user import User
 from app.models.task import Task
 from app.models.invite import Invite
 from app.models.access_token import AccessToken
+from app.models.course import ClassSession, Course
+from app.models.focus_session import FocusSession
+from app.models.goal import Goal
 
 
 # this is the Alembic Config object, which provides

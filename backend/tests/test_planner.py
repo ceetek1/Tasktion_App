@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 
 from app.core.database import SessionLocal
+from app.models.course import Course
 from app.models.task import Task
 from app.models.user import User
 from app.services import planner
@@ -18,6 +19,16 @@ def _task(owner_id, title, due, **fields):
     task_id = task.id
     db.close()
     return task_id
+
+
+def _course(owner_id, name):
+    db = SessionLocal()
+    course = Course(user_id=owner_id, name=name, glyph=name[0], colour="#5F8A8B")
+    db.add(course)
+    db.commit()
+    course_id = course.id
+    db.close()
+    return course_id
 
 
 def _set_user(user_id, **fields):
@@ -114,7 +125,7 @@ def test_today_buckets_and_load(member, other_member):
     slipped = _task(uid, "Slipped", NOW + timedelta(days=4), planned_for=TODAY - timedelta(days=2))
     overdue = _task(uid, "Overdue", NOW - timedelta(hours=3))
     soon = _task(uid, "Due tomorrow", NOW + timedelta(hours=30))
-    exam = _task(uid, "Chem exam", NOW + timedelta(days=6), kind="exam", course="Chemistry")
+    exam = _task(uid, "Chem exam", NOW + timedelta(days=6), kind="exam", course_id=_course(uid, "Chemistry"))
     _task(uid, "Far exam", NOW + timedelta(days=10), kind="exam")
     _task(uid, "Done today", NOW + timedelta(days=1), planned_for=TODAY, status="completed")
     _task(other_member["id"], "Not mine", NOW + timedelta(hours=5), planned_for=TODAY)
@@ -185,16 +196,18 @@ def test_next_ranks_with_reasons(member):
     overdue = _task(uid, "Overdue", NOW - timedelta(days=2))
     due_today = _task(uid, "Due tonight", NOW + timedelta(hours=8))
     planned = _task(uid, "Planned today", NOW + timedelta(days=10), planned_for=TODAY)
-    _task(uid, "Exam itself", NOW + timedelta(hours=2), kind="exam", course="History")
-    revision = _task(uid, "Revise history", NOW + timedelta(days=9), kind="revision", course="history")
+    exam = _task(uid, "History exam", NOW + timedelta(hours=2), kind="exam", guardian="golem")
+    revision = _task(uid, "Revise history", NOW + timedelta(days=9), kind="revision", boss_task_id=exam)
+    # Same course but not aimed at the exam: no boost
+    _task(uid, "Unlinked revision", NOW + timedelta(days=30), kind="revision")
 
     suggestions = _with_user(uid, planner.next_up, limit=10, now=NOW)
 
-    assert [s.task.id for s in suggestions] == [overdue, due_today, revision, planned, far]
+    assert [s.task.id for s in suggestions][:5] == [overdue, due_today, revision, planned, far]
     reasons = {s.task.id: s.reasons for s in suggestions}
     assert reasons[overdue] == ["overdue by 2 days"]
     assert reasons[due_today][0].startswith("due within 24 h")
-    assert reasons[revision] == ["revision for the History exam today 14:00"]
+    assert reasons[revision] == ['revision for the exam "History exam" today 14:00']
     assert reasons[planned] == ["planned for today"]
     assert reasons[far][0].startswith("next deadline")
 

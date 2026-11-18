@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
 
+from app.schemas.study import DayClass
 from app.schemas.task import TaskRead
 
 
@@ -71,6 +72,7 @@ class TodayPlan(BaseModel):
     overdue: list[TaskRead]
     due_soon: list[TaskRead]
     exams: list[TaskRead]
+    classes: list[DayClass] = Field(description="Today's weekly classes")
     load: Load
 
 
@@ -78,6 +80,7 @@ class DayPlan(Load):
     date: date
     tasks: list[TaskRead]
     due: list[TaskRead]
+    classes: list[DayClass]
 
 
 class WeekPlan(BaseModel):

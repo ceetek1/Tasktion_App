@@ -1,8 +1,8 @@
 import uuid
-from datetime import date, time
+from datetime import date, datetime, time
 
 from app.core.database import Base
-from sqlalchemy import CheckConstraint, Index, Time, Uuid, false, text
+from sqlalchemy import CheckConstraint, DateTime, Index, String, Time, Uuid, false, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
@@ -11,6 +11,7 @@ class User(Base):
     __table_args__ = (
         Index("uq_users_email_lower", text("lower(email)"), unique=True),
         CheckConstraint("daily_capacity_minutes > 0", name="ck_user_capacity_positive"),
+        CheckConstraint("term_weeks BETWEEN 1 AND 52", name="ck_user_term_weeks"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -28,6 +29,12 @@ class User(Base):
     evening_at: Mapped[time] = mapped_column(Time, default=time(21, 0), server_default="21:00")
     last_morning_briefing_on: Mapped[date | None] = mapped_column(nullable=True)
     last_evening_briefing_on: Mapped[date | None] = mapped_column(nullable=True)
+
+    # The current term, set in onboarding
+    term_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    term_start: Mapped[date | None] = mapped_column(nullable=True)
+    term_weeks: Mapped[int | None] = mapped_column(nullable=True)
+    onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_tasks = relationship("Task", foreign_keys="Task.user_id", back_populates="owner")
     assigned_tasks = relationship("Task", foreign_keys="Task.assigned_to", back_populates="assignee")

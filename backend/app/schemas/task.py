@@ -9,6 +9,12 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
 
 
+class Guardian(str, Enum):
+    KRAKEN = "kraken"
+    DRAGON = "dragon"
+    GOLEM = "golem"
+
+
 class TaskKind(str, Enum):
     TASK = "task"
     ASSIGNMENT = "assignment"
@@ -48,10 +54,13 @@ class TaskCreate(BaseModel):
     description: str | None = None
     due_date: datetime
     assigned_to: int | None = None
-    course: str | None = Field(None, max_length=80)
+    course_id: int | None = None
+    course: str | None = Field(None, max_length=80, description="A course name; found or created. Use course_id or this.")
     kind: TaskKind = TaskKind.TASK
     planned_for: date | None = None
     estimate_minutes: int | None = Field(None, gt=0, le=1440)
+    guardian: Guardian | None = Field(None, description="Exams only")
+    boss_task_id: int | None = Field(None, description="The exam task a revision task prepares for")
 
     @field_validator("due_date")
     @classmethod
@@ -72,11 +81,14 @@ class TaskRead(BaseModel):
     status: TaskStatus = TaskStatus.PENDING
     user_id: int
     assigned_to: int | None = None
-    course: str | None = None
+    course_id: int | None = None
+    course: str | None = Field(None, description="The course's name, for convenience")
     kind: TaskKind = TaskKind.TASK
     planned_for: date | None = None
     estimate_minutes: int | None = None
     completed_at: datetime | None = None
+    guardian: Guardian | None = None
+    boss_task_id: int | None = None
     model_config = ConfigDict(from_attributes=True)
 
     @field_serializer("due_date")
@@ -94,11 +106,14 @@ class TaskUpdate(BaseModel):
     due_date: datetime | None = None
     status: TaskStatus | None = None
     assigned_to: int | None = None
+    course_id: int | None = None
     course: str | None = Field(None, max_length=80)
     kind: TaskKind | None = None
     # null takes the task off the plan
     planned_for: date | None = None
     estimate_minutes: int | None = Field(None, gt=0, le=1440)
+    guardian: Guardian | None = None
+    boss_task_id: int | None = None
 
     @field_validator("due_date")
     @classmethod
