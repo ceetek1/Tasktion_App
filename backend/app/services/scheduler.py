@@ -6,7 +6,10 @@ from sqlalchemy.orm import joinedload
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.task import Task
+from app.models.user import User
+from app.services.briefings import due_slot, evening_briefing, morning_briefing
 from app.services.email_service import send_email
+from app.services.planner import clock_for
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +18,7 @@ scheduler = BackgroundScheduler(timezone=timezone.utc)
 
 REMINDER_WINDOW = timedelta(hours=24)
 REMINDER_INTERVAL_MINUTES = 60
+BRIEFING_INTERVAL_MINUTES = 15
 
 
 def send_reminders() -> dict:
@@ -75,6 +79,44 @@ def send_reminders() -> dict:
         db.close()
 
 
+def send_briefings(now: datetime | None = None) -> dict:
+    """Email each member who turned briefings on their morning and evening briefing, once per local day."""
+    if not settings.email_enabled:
+        logger.info("Briefings skipped because SMTP is not configured")
+        return {"email_enabled": False, "sent": 0}
+
+    db = SessionLocal()
+    sent = 0
+    try:
+        users = db.query(User).filter(User.briefings_enabled.is_(True)).order_by(User.id).all()
+        for user in users:
+            user_id = user.id
+            try:
+                clock = clock_for(user, now)
+                day = due_slot(user.morning_at, user.last_morning_briefing_on, clock)
+                if day is not None:
+                    subject, body = morning_briefing(db, user, clock)
+                    if send_email(user.email, subject, body):
+                        user.last_morning_briefing_on = day
+                        db.commit()
+                        sent += 1
+                day = due_slot(user.evening_at, user.last_evening_briefing_on, clock)
+                if day is not None:
+                    subject, body = evening_briefing(db, user, clock, day)
+                    if send_email(user.email, subject, body):
+                        user.last_evening_briefing_on = day
+                        db.commit()
+                        sent += 1
+            except Exception:
+                # One member's bad data mustn't stop everyone else's briefing
+                db.rollback()
+                logger.exception("Briefing failed for user %s", user_id)
+        logger.info("Briefing check complete. %d briefing(s) sent.", sent)
+        return {"email_enabled": True, "sent": sent}
+    finally:
+        db.close()
+
+
 def configure_scheduler():
     """Register scheduled jobs. Called during FastAPI startup."""
     if not settings.SCHEDULER_ENABLED:
@@ -91,5 +133,19 @@ def configure_scheduler():
         coalesce=True,
         max_instances=1,
     )
-    logger.info("Scheduler configured: send_reminders runs every %d minutes", REMINDER_INTERVAL_MINUTES)
+    scheduler.add_job(
+        send_briefings,
+        "interval",
+        minutes=BRIEFING_INTERVAL_MINUTES,
+        id="send_briefings",
+        replace_existing=True,
+        next_run_time=datetime.now(timezone.utc) + timedelta(seconds=45),
+        coalesce=True,
+        max_instances=1,
+    )
+    logger.info(
+        "Scheduler configured: send_reminders every %d minutes, send_briefings every %d minutes",
+        REMINDER_INTERVAL_MINUTES,
+        BRIEFING_INTERVAL_MINUTES,
+    )
     return True

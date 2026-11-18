@@ -15,7 +15,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800&display=swap">
-    <link rel="stylesheet" href="../css/style.css?v=3">
+    <link rel="stylesheet" href="../css/style.css?v=4">
 </head>
 <body>
     <header class="appbar">
@@ -63,6 +63,9 @@
             <div class="main-head">
                 <h1>Bugs to squash</h1>
                 <div class="main-actions">
+                <button class="btn" id="claude-btn" type="button">
+                    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><g class="i"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-7l-4 4v-4H6a2 2 0 0 1-2-2z"/><path d="M9 10.5h6"/></g></svg>Connect Claude Desktop
+                </button>
                 <button class="btn" id="invite-btn" type="button">
                     <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><g class="i"><circle cx="9" cy="8" r="4"/><path d="M2 21c1-4 3.5-6 7-6s6 2 7 6M19 8v6M16 11h6"/></g></svg>Invite a friend
                 </button>
@@ -165,6 +168,32 @@
         </div>
     </dialog>
 
+    <!-- Connect Claude Desktop -->
+    <dialog class="sheet invite-sheet" id="claude-dialog" aria-labelledby="claude-h">
+        <div class="sheet-body">
+            <div class="sheet-head">
+                <h2 id="claude-h">Connect Claude Desktop</h2>
+                <button type="button" class="icon-btn" data-close aria-label="Close"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path class="i" stroke-width="3" d="M6 6l12 12M18 6L6 18"/></svg></button>
+            </div>
+            <p class="auth-note">Plan your week by chatting with Claude. Make a token, paste the setup into Claude Desktop's <code>claude_desktop_config.json</code>, then restart Claude Desktop.</p>
+            <div class="token-new hidden" id="claude-new">
+                <p class="auth-note" id="claude-new-line">Here's your new token. Copy it now: Tasktion shows it only once.</p>
+                <label for="claude-config" class="label-line">Setup for claude_desktop_config.json</label>
+                <textarea id="claude-config" class="input code-block" rows="13" readonly spellcheck="false" aria-describedby="claude-new-line claude-path-note"></textarea>
+                <p class="auth-note muted" id="claude-path-note">Change both <code>/path/to/Tasktion_App</code> parts to where Tasktion is on your Mac. The README's "Plan with Claude Desktop" section walks through it.</p>
+                <div><button type="button" class="btn btn-small" id="claude-copy">Copy setup</button></div>
+            </div>
+            <h3 class="token-h">Your tokens</h3>
+            <p class="auth-note muted" id="claude-tokens-line">Loading…</p>
+            <ul class="token-list" id="claude-tokens"></ul>
+            <p class="field-error" id="claude-error" role="alert"></p>
+            <div class="sheet-foot">
+                <button type="button" class="btn" data-close>Done</button>
+                <button type="button" class="btn btn-primary" id="claude-create">Make a token</button>
+            </div>
+        </div>
+    </dialog>
+
     <div class="toast hidden" id="toast" role="status" aria-live="polite">
         <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><path class="o" d="M24 4 L29 17 L43 18 L32 27 L36 41 L24 33 L12 41 L16 27 L5 18 L19 17 Z" fill="#FFD166"/></svg>
         <div><span class="toast-title" id="toast-title">SQUASH! +20 XP</span><span class="toast-line" id="toast-line"></span></div>
@@ -173,9 +202,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
     <script src="../js/config.js?v=3"></script>
     <script src="../js/session.js?v=3"></script>
-    <script src="../js/api.js?v=3"></script>
+    <script src="../js/api.js?v=4"></script>
     <script src="../js/critters.js?v=3"></script>
     <script src="../js/auth.js?v=3"></script>
-    <script src="../js/tasks.js?v=3"></script>
+    <script src="../js/tasks.js?v=4"></script>
 </body>
 </html>

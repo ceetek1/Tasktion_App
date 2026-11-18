@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -15,7 +15,10 @@ from app.core.database import engine
 from app.api.auth import router as auth_router
 from app.api.invites import router as invites_router
 from app.api.cron import router as cron_router
+from app.api.planner import router as planner_router
 from app.api.tasks import router as tasks_router
+from app.api.study import router as study_router
+from app.api.tokens import router as tokens_router
 from app.api.users import router as users_router
 from app.services.scheduler import configure_scheduler, scheduler
 
@@ -59,6 +62,9 @@ app.include_router(auth_router)
 app.include_router(invites_router)
 app.include_router(cron_router)
 app.include_router(users_router)
+app.include_router(tokens_router)
+app.include_router(planner_router)
+app.include_router(study_router)
 
 
 @app.get("/health", tags=["health"])
@@ -80,7 +86,8 @@ def database_health_check():
 
 @app.get("/", include_in_schema=False)
 def root():
-    return RedirectResponse(url="/pages/login.html")
+    # The Zen Voyage app; the classic pages stay at /pages/
+    return RedirectResponse(url="/app/")
 
 
 @app.get("/js/config.js", include_in_schema=False)
@@ -96,5 +103,31 @@ def frontend_config():
 
 # The API server also serves the pages in public/
 frontend_dir = Path(__file__).resolve().parents[2] / "public"
+# The Zen Voyage app, built by `npm run build` in frontend/
+spa_dir = frontend_dir / "app"
+
+
+@app.get("/app", include_in_schema=False)
+def spa_root():
+    return RedirectResponse(url="/app/")
+
+
+@app.get("/app/{path:path}", include_in_schema=False)
+def spa(path: str):
+    """Files of the built app, and its index.html for every in-app address (e.g. /app/day/2026-11-20)."""
+    index = spa_dir / "index.html"
+    if not index.is_file():
+        raise HTTPException(status_code=404, detail="The app isn't built yet. Run `npm ci && npm run build` in frontend/.")
+    root = spa_dir.resolve()
+    target = (spa_dir / path).resolve()
+    if path and target.is_file() and root in target.parents:
+        # Built assets have content hashes in their names, so they never change
+        immutable = path.startswith("assets/")
+        return FileResponse(target, headers={"Cache-Control": "public, max-age=31536000, immutable" if immutable else "no-cache"})
+    if path.startswith("assets/"):
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(index, headers={"Cache-Control": "no-cache"})
+
+
 if frontend_dir.exists():
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
