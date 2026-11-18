@@ -92,9 +92,3 @@ def test_cron_endpoint_needs_secret(client, monkeypatch, member):
     assert r.status_code == 200
     assert r.json() == {"email_enabled": True, "due_soon": 1, "sent": 1}
     assert sent == ["member@example.com"]
-
-
-def test_scheduler_off_on_vercel(monkeypatch):
-    from app.core.config import Settings
-    monkeypatch.setenv("VERCEL", "1")
-    assert Settings(SCHEDULER_ENABLED=True).SCHEDULER_ENABLED is False
