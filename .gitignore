@@ -49,3 +49,7 @@ backend/.env.*
 *.swo
 
 AGENTS.md
+# Frontend
+node_modules
+# Built by `npm run build` in frontend/
+public/app/
