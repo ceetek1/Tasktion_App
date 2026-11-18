@@ -125,13 +125,17 @@ All sign-in goes through Supabase Auth. The callback URL every provider needs is
 
 ## Deployment (Railway)
 
-The app runs on Railway as one always-on web service, configured by `railway.json`. The FastAPI server runs the API, serves the pages in `public/`, and sends reminders from its in-process scheduler. The database and sign-in stay on Supabase. Use the Hobby plan so the service never pauses.
+The app runs on Railway as one always-on web service. The FastAPI server runs the API, serves the pages in `public/`, and sends reminders from its in-process scheduler. The database and sign-in stay on Supabase. Use the Hobby plan so the service never pauses.
 
 ### 1. Create the Railway service
 
 1. At [railway.com/new](https://railway.com/new), choose **Deploy from GitHub repo** and pick this repository. Railway builds it with Railpack, using the Python version in `.python-version`.
 2. Under the service's **Settings → Source**, check the branch is `main`. Every push to `main` then deploys automatically.
-3. Before each deploy, Railway runs `alembic -c backend/alembic.ini upgrade head`, so migrations apply themselves. A failed migration stops the deploy and the old version keeps running.
+3. Under the service's **Settings → Deploy**, set:
+   - **Pre-deploy command:** `alembic -c backend/alembic.ini upgrade head`, so migrations apply themselves. A failed migration stops the deploy and the old version keeps running.
+   - **Start command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend --workers 1`
+   - **Healthcheck path:** `/health` (timeout 120 seconds)
+   - **Regions:** one replica in EU West (Amsterdam), close to the Supabase database.
 
 > ⚠️ Migration `c4d2e8f1a9b3` deletes all users and tasks from the old password-based version.
 
@@ -147,7 +151,7 @@ Under the service's **Variables** tab, add these (copy the secrets from `backend
 - `CRON_SECRET` (optional): lets you trigger reminders by hand with `POST /cron/reminders`.
 - `APP_URL`: the public address from step 3.
 
-`railway.json` starts a single uvicorn worker and one replica, so each reminder is sent once. Keep it that way, or set `SCHEDULER_ENABLED=false` on all but one process.
+The start command runs a single uvicorn worker on one replica, so each reminder is sent once. Keep it that way, or set `SCHEDULER_ENABLED=false` on all but one process.
 
 ### 3. Point everything at the live address
 
@@ -185,7 +189,6 @@ Tasktion_App/
 │   └── js/                          # Frontend scripts (session, api, auth, tasks)
 ├── requirements.txt                 # Python dependencies
 ├── Procfile                         # PaaS process commands
-├── railway.json                     # Railway build and deploy settings
 ├── .gitignore
 └── README.md
 ```
