@@ -85,3 +85,25 @@ async function deleteTask(taskId) {
 async function fetchUsers() {
     return apiRequest("GET", "/users");
 }
+
+// Planner settings
+async function fetchPlannerSettings() {
+    return apiRequest("GET", "/planner/settings");
+}
+
+async function updatePlannerSettings(changes) {
+    return apiRequest("PATCH", "/planner/settings", changes);
+}
+
+// Personal access tokens (Claude Desktop)
+async function createAccessToken(name) {
+    return apiRequest("POST", "/tokens", { name: name });
+}
+
+async function fetchAccessTokens() {
+    return apiRequest("GET", "/tokens");
+}
+
+async function revokeAccessToken(tokenId) {
+    return apiRequest("DELETE", `/tokens/${tokenId}`);
+}

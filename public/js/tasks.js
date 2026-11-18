@@ -31,6 +31,7 @@
         empty: document.getElementById("task-empty"),
         filters: document.getElementById("filters"),
         inviteDialog: document.getElementById("invite-dialog"),
+        claudeDialog: document.getElementById("claude-dialog"),
         taskDialog: document.getElementById("task-dialog"),
         taskForm: document.getElementById("task-form"),
         detailDialog: document.getElementById("detail-dialog"),
@@ -626,13 +627,157 @@
     });
     document.getElementById("invite-btn").addEventListener("click", openInvite);
 
+    // ---------- Connect Claude Desktop ----------
+    var cl = {
+        create: document.getElementById("claude-create"),
+        newBox: document.getElementById("claude-new"),
+        config: document.getElementById("claude-config"),
+        copy: document.getElementById("claude-copy"),
+        list: document.getElementById("claude-tokens"),
+        listLine: document.getElementById("claude-tokens-line"),
+        error: document.getElementById("claude-error")
+    };
+
+    function claudeConfig(token) {
+        var root = "/path/to/Tasktion_App";
+        return JSON.stringify({
+            mcpServers: {
+                tasktion: {
+                    command: root + "/tasktion_mcp/.venv/bin/python",
+                    args: [root + "/tasktion_mcp/server.py"],
+                    env: { TASKTION_URL: window.location.origin, TASKTION_TOKEN: token }
+                }
+            }
+        }, null, 2);
+    }
+
+    function shortDate(iso) {
+        return new Date(iso).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
+    }
+
+    function tokenRow(token, confirming) {
+        var detail = token.prefix + "… · made " + shortDate(token.created_at) +
+            (token.last_used_at ? " · last used " + shortDate(token.last_used_at) : " · not used yet");
+        var actions = el("div", { "class": "token-actions" });
+        var li = el("li", {}, [
+            el("div", { "class": "token-meta" }, [
+                el("span", { "class": "token-name", text: token.name }),
+                el("span", { "class": "token-detail", text: detail })
+            ]),
+            actions
+        ]);
+        if (confirming) {
+            actions.appendChild(el("button", {
+                type: "button", "class": "btn btn-small", text: "Keep it",
+                onclick: function () { li.replaceWith(tokenRow(token, false)); }
+            }));
+            actions.appendChild(el("button", {
+                type: "button", "class": "btn btn-small btn-danger-solid", text: "Yes, revoke",
+                "aria-label": "Yes, revoke " + token.name + " (" + token.prefix + ")",
+                onclick: function () { revoke(token); }
+            }));
+        } else {
+            actions.appendChild(el("button", {
+                type: "button", "class": "btn btn-small btn-danger", text: "Revoke",
+                "aria-label": "Revoke " + token.name + " (" + token.prefix + ")",
+                onclick: function () {
+                    var row = tokenRow(token, true);
+                    li.replaceWith(row);
+                    row.querySelector("button").focus();
+                }
+            }));
+        }
+        return li;
+    }
+
+    async function loadTokens() {
+        cl.list.innerHTML = "";
+        cl.listLine.textContent = "Loading…";
+        cl.listLine.classList.remove("hidden");
+        try {
+            var tokens = await fetchAccessTokens();
+            tokens.forEach(function (t) { cl.list.appendChild(tokenRow(t, false)); });
+            cl.listLine.textContent = tokens.length ? "" : "No tokens yet. Claude Desktop can't reach your planner until you make one.";
+            cl.listLine.classList.toggle("hidden", tokens.length > 0);
+        } catch (err) {
+            if (handleAuthError(err)) return;
+            cl.listLine.textContent = "Couldn't load your tokens: " + err.message;
+        }
+    }
+
+    async function revoke(token) {
+        cl.error.textContent = "";
+        try {
+            await revokeAccessToken(token.id);
+            toast("Revoked", "Anything using " + token.prefix + "… is cut off.");
+            await loadTokens();
+            cl.create.focus();
+        } catch (err) {
+            if (handleAuthError(err)) return;
+            cl.error.textContent = "Couldn't revoke it: " + err.message;
+        }
+    }
+
+    function openClaude() {
+        cl.error.textContent = "";
+        cl.config.value = "";
+        cl.newBox.classList.add("hidden");
+        els.claudeDialog.showModal();
+        loadTokens();
+    }
+
+    cl.create.addEventListener("click", async function () {
+        cl.error.textContent = "";
+        cl.create.disabled = true;
+        try {
+            var created = await createAccessToken("Claude Desktop");
+            cl.config.value = claudeConfig(created.token);
+            cl.newBox.classList.remove("hidden");
+            cl.config.focus();
+            cl.config.select();
+            await loadTokens();
+        } catch (err) {
+            if (handleAuthError(err)) return;
+            cl.error.textContent = "Couldn't make a token: " + err.message;
+        } finally {
+            cl.create.disabled = false;
+        }
+    });
+    cl.copy.addEventListener("click", async function () {
+        try {
+            await navigator.clipboard.writeText(cl.config.value);
+            toast("Copied!", "Paste it into claude_desktop_config.json.");
+        } catch (e) {
+            cl.config.focus();
+            cl.config.select();
+            toast("Select and copy", "Your browser blocked copying, so the setup is highlighted.", true);
+        }
+    });
+    // The token is shown once; don't leave it in the page after the dialog closes
+    els.claudeDialog.addEventListener("close", function () {
+        cl.config.value = "";
+        cl.newBox.classList.add("hidden");
+    });
+    document.getElementById("claude-btn").addEventListener("click", openClaude);
+
+    // ---------- Planner timezone ----------
+    // Briefing emails and "today" follow the timezone of the browser you last signed in on
+    function syncTimezone() {
+        var zone = null;
+        try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) { /* very old browser */ }
+        if (!zone) return;
+        fetchPlannerSettings()
+            .then(function (s) { if (s.timezone !== zone) return updatePlannerSettings({ timezone: zone }); })
+            .catch(function () { /* the planner keeps its last timezone */ });
+    }
+
     // ---------- Wiring ----------
     document.getElementById("add-task-btn").addEventListener("click", function () { openForm(null); });
     document.getElementById("fab").addEventListener("click", function () { openForm(null); });
     document.querySelectorAll("[data-close]").forEach(function (b) {
         b.addEventListener("click", function () { b.closest("dialog").close(); });
     });
-    [els.taskDialog, els.detailDialog, els.inviteDialog].forEach(function (dlg) {
+    [els.taskDialog, els.detailDialog, els.inviteDialog, els.claudeDialog].forEach(function (dlg) {
         // Click on the dimmed backdrop closes the sheet
         dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); });
     });
@@ -656,6 +801,7 @@
             } else {
                 avatar.textContent = displayName(user).charAt(0);
             }
+            syncTimezone();
             return loadTasks();
         })
         .catch(function (err) {
